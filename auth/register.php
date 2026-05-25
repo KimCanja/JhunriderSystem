@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = trim($_POST['password'] ?? '');
     $confirm_password = trim($_POST['confirm_password'] ?? '');
-    $role = $_POST['role'] ?? 'customer';
+    $role = 'customer'; // Force role to customer only
     $terms = isset($_POST['terms']) ? true : false;
 
     // Validation
@@ -52,10 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $user_id = $pdo->lastInsertId();
 
-                if ($role === 'customer') {
-                    $stmt = $pdo->prepare("INSERT INTO customers (user_id) VALUES (?)");
-                    $stmt->execute([$user_id]);
-                }
+                // Always create customer record since role is always 'customer'
+                $stmt = $pdo->prepare("INSERT INTO customers (user_id) VALUES (?)");
+                $stmt->execute([$user_id]);
 
                 $success = 'Registration successful! Redirecting to login...';
                 header("refresh:2;url=login.php");
@@ -313,40 +312,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             opacity: 0.6;
         }
 
-        /* Role Selector */
-        .role-selector {
-            display: flex;
-            gap: 15px;
-            margin-top: 5px;
-        }
-
-        .role-option {
-            flex: 1;
-        }
-
-        .role-option input[type="radio"] {
-            display: none;
-        }
-
-        .role-option label {
+        /* Customer Info Box */
+        .customer-info {
+            background: rgba(22, 163, 74, 0.1);
+            border: 1px solid var(--primary-green);
+            border-radius: 10px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px;
-            border: 2px solid var(--border-color);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: var(--charcoal-deep);
-            font-weight: 500;
-            color: var(--text-muted);
+            gap: 10px;
         }
 
-        .role-option input[type="radio"]:checked + label {
-            border-color: var(--primary-green);
-            background: rgba(22, 163, 74, 0.1);
+        .customer-info i {
             color: var(--primary-green);
+            font-size: 18px;
+        }
+
+        .customer-info span {
+            color: var(--text-dark);
+            font-size: 13px;
         }
 
         /* Password Requirements */
@@ -490,10 +475,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             .form-panel {
                 padding: 30px 20px;
             }
-            .role-selector {
-                flex-direction: column;
-                gap: 10px;
-            }
         }
     </style>
 </head>
@@ -558,19 +539,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
-                <!-- Account Type -->
-                <div class="mb-3">
-                    <label class="form-label">Account Type</label>
-                    <div class="role-selector">
-                        <div class="role-option">
-                            <input type="radio" id="customer" name="role" value="customer" checked>
-                            <label for="customer"><i class="fas fa-user"></i> Customer</label>
-                        </div>
-                        <div class="role-option">
-                            <input type="radio" id="admin" name="role" value="admin">
-                            <label for="admin"><i class="fas fa-user-tie"></i> Admin</label>
-                        </div>
-                    </div>
+                <!-- Customer Info Box (Replaces Role Selector) -->
+                <div class="customer-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span>You are registering as a <strong>Customer</strong>. You'll be able to browse and rent vehicles once registered.</span>
                 </div>
 
                 <!-- Password Field (Lock icon left, Eye icon right) -->

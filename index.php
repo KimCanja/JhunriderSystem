@@ -20,6 +20,10 @@ if (isset($_SESSION['user_id'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
+    
+    <!-- SweetAlert2 for better notifications -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     <style>
         * {
             margin: 0;
@@ -49,12 +53,6 @@ if (isset($_SESSION['user_id'])) {
             --border-color: #E5E7EB;
             --bg-light: #F3F4F6;
             --white: #FFFFFF;
-            --status-available-bg: #DCFCE7;
-            --status-available-text: #166534;
-            --status-booked-bg: #FEE2E2;
-            --status-booked-text: #991B1B;
-            --status-pending-bg: #FEF9C3;
-            --status-pending-text: #854D0E;
         }
 
         /* Navigation */
@@ -75,11 +73,6 @@ if (isset($_SESSION['user_id'])) {
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-
-        .navbar-brand i {
-            color: var(--primary-green);
-            margin-right: 8px;
         }
 
         .nav-link {
@@ -127,21 +120,6 @@ if (isset($_SESSION['user_id'])) {
             transform: translateY(-2px);
         }
 
-        .btn-accent {
-            background: var(--primary-green);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 12px 28px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .btn-accent:hover {
-            background: var(--primary-green-dark);
-            transform: translateY(-2px);
-        }
-
         /* Hero Section */
         .hero {
             background: linear-gradient(135deg, var(--charcoal) 0%, var(--charcoal-deep) 100%);
@@ -177,16 +155,138 @@ if (isset($_SESSION['user_id'])) {
             margin-bottom: 40px;
         }
 
-        /* Booking Form */
-        .booking-form {
-            background: rgba(255,255,255,0.95);
-            border-radius: 16px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        /* Stats Banner */
+        .stats-banner {
+            background: var(--white);
+            padding: 60px 0;
+            margin-top: -40px;
+            position: relative;
+            z-index: 10;
+            border-radius: 30px 30px 0 0;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.05);
         }
 
-        .booking-form input,
-        .booking-form select {
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 48px;
+            font-weight: 800;
+            font-family: 'Poppins', sans-serif;
+            color: var(--primary-green);
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 16px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .stat-icon {
+            font-size: 40px;
+            color: var(--primary-green-light);
+            margin-bottom: 15px;
+            opacity: 0.8;
+        }
+
+        /* CTA Banner */
+        .cta-banner {
+            background: linear-gradient(135deg, var(--primary-green-dark) 0%, var(--primary-green) 100%);
+            padding: 80px 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-banner::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1%, transparent 1%);
+            background-size: 50px 50px;
+            animation: moveDots 20s linear infinite;
+        }
+
+        @keyframes moveDots {
+            from { transform: translate(0, 0); }
+            to { transform: translate(50px, 50px); }
+        }
+
+        .cta-banner h2 {
+            font-size: 48px;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-banner p {
+            font-size: 20px;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn-cta {
+            background: white;
+            color: var(--primary-green);
+            border: none;
+            border-radius: 50px;
+            padding: 15px 40px;
+            font-weight: 700;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn-cta:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            color: var(--primary-green-dark);
+        }
+
+        /* Simple Booking Form */
+        .simple-booking {
+            background: rgba(255,255,255,0.95);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+
+        .simple-booking h3 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--charcoal);
+            margin-bottom: 15px;
+        }
+
+        .simple-booking p {
+            color: var(--text-muted);
+            margin-bottom: 25px;
+        }
+
+        .location-select {
+            max-width: 400px;
+            margin: 0 auto 20px;
+        }
+
+        .location-select select {
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 12px;
@@ -195,8 +295,7 @@ if (isset($_SESSION['user_id'])) {
             background: var(--white);
         }
 
-        .booking-form input:focus,
-        .booking-form select:focus {
+        .location-select select:focus {
             border-color: var(--primary-green);
             outline: none;
             box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
@@ -262,124 +361,71 @@ if (isset($_SESSION['user_id'])) {
             margin-bottom: 50px;
         }
 
-        /* Vehicle Cards */
-        .vehicle-card {
-            background: var(--white);
-            border-radius: 12px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            height: 100%;
-            border: 1px solid var(--border-color);
-        }
-
-        .vehicle-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            border-color: var(--primary-green);
-        }
-
-        .vehicle-image {
-            height: 220px;
-            overflow: hidden;
-        }
-
-        .vehicle-image img {
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
-            transition: transform 0.3s ease;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
         }
 
-        .vehicle-card:hover .vehicle-image img {
-            transform: scale(1.05);
+        .loading-overlay.active {
+            display: flex;
         }
 
-        .vehicle-info {
-            padding: 20px;
-        }
-
-        .vehicle-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--charcoal);
-            margin-bottom: 5px;
-        }
-
-        .vehicle-type {
-            color: var(--text-muted);
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-
-        .vehicle-price {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary-green-light);
-            margin: 15px 0;
-        }
-
-        .vehicle-price span {
-            font-size: 14px;
-            font-weight: 400;
-            color: var(--text-muted);
-        }
-
-        /* Offer Section */
-        .offer-section {
-            background: var(--primary-green);
-            padding: 60px 0;
+        .loading-content {
             text-align: center;
-        }
-
-        .offer-section h2 {
-            font-size: 42px;
-            font-weight: 800;
-            color: white;
-            margin-bottom: 15px;
-        }
-
-        .offer-section p {
-            font-size: 18px;
-            color: rgba(255,255,255,0.9);
-            margin-bottom: 30px;
-        }
-
-        /* Testimonial Cards */
-        .testimonial-card {
-            background: var(--white);
-            border-radius: 12px;
+            background: white;
             padding: 30px;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            height: 100%;
-            transition: all 0.3s ease;
-            border: 1px solid var(--border-color);
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
 
-        .testimonial-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
-            border-color: var(--primary-green);
-        }
-
-        .testimonial-image {
-            width: 80px;
-            height: 80px;
+        .loading-content .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-green);
             border-radius: 50%;
+            animation: spin 1s linear infinite;
             margin: 0 auto 15px;
-            object-fit: cover;
         }
 
-        .rating i {
-            color: var(--primary-green-light);
-            margin: 0 2px;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        .testimonial-text {
-            color: var(--text-dark);
-            font-style: italic;
-            margin: 20px 0;
+        /* Notification Toast */
+        .toast-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--primary-green);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         /* Footer */
@@ -449,16 +495,32 @@ if (isset($_SESSION['user_id'])) {
             .hero p {
                 font-size: 16px;
             }
-            .offer-section h2 {
-                font-size: 28px;
-            }
             .section-title {
                 font-size: 28px;
+            }
+            .stat-number {
+                font-size: 32px;
+            }
+            .cta-banner h2 {
+                font-size: 32px;
             }
         }
     </style>
 </head>
 <body>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Updating content...</p>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast-notification" id="toastNotification">
+        <i class="fas fa-check-circle"></i> <span id="toastMessage">Content updated!</span>
+    </div>
 
     <!-- Header / Navigation -->
     <nav class="navbar navbar-expand-lg">
@@ -471,10 +533,9 @@ if (isset($_SESSION['user_id'])) {
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav mx-auto">
-                    <li class="nav-item"><a class="nav-link" href="#">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#vehicles">Vehicles</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" data-section="home">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" data-section="about">About</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" data-section="contact">Contact</a></li>
                 </ul>
                 <div class="d-flex gap-2">
                     <a href="auth/login.php" class="btn btn-outline-custom">Login</a>
@@ -484,238 +545,73 @@ if (isset($_SESSION['user_id'])) {
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <div class="row justify-content-center text-center">
-                <div class="col-lg-8">
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px;">
-                        <h1 style="margin: 0; font-size: 42px;">Tagum City Rent Car Jhunrider</h1>
+    <!-- Main Content Container -->
+    <div id="mainContent">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <div class="row justify-content-center text-center">
+                    <div class="col-lg-8">
+                        <h1 style="margin-bottom: 20px; font-size: 52px;">Tagum City Rent Car Jhunrider</h1>
+                        <p>Affordable. Reliable. Hassle-Free.</p>
                     </div>
-                    <p>Affordable. Reliable. Hassle-Free.</p>
                 </div>
-            </div>
-            
-            <!-- Booking Form -->
-            <div class="row justify-content-center mt-4">
-                <div class="col-lg-10">
-                    <div class="booking-form">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <select class="form-select">
-                                    <option>Pickup Location</option>
-                                    <option>Tagum City</option>
-                                    <option>Davao City</option>
-                                    <option>Samal Island</option>
+                
+                <!-- Simple Booking Form -->
+                <div class="row justify-content-center mt-4">
+                    <div class="col-lg-6">
+                        <div class="simple-booking">
+                            <h3>Find Your Perfect Ride</h3>
+                            <p>Select your preferred location to get started</p>
+                            <div class="location-select">
+                                <select id="location" class="form-select">
+                                    <option value="Tagum City">📍 Tagum City</option>
+                                    <option value="Davao City">📍 Davao City</option>
+                                    <option value="Samal Island">📍 Samal Island</option>
                                 </select>
                             </div>
-                            <div class="col-md-3">
-                                <input type="date" class="form-control" placeholder="Pickup Date">
-                            </div>
-                            <div class="col-md-3">
-                                <input type="date" class="form-control" placeholder="Return Date">
-                            </div>
-                            <div class="col-md-2">
-                                <button class="btn btn-primary-custom w-100">Search</button>
-                            </div>
+                            <button class="btn btn-primary-custom" id="exploreBtn">
+                                <i class="fas fa-car"></i> Explore Vehicles
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- Features Section -->
-    <section class="py-5" style="background: var(--bg-light);">
-        <div class="container">
-            <div class="text-center">
-                <h2 class="section-title">Why Choose Us</h2>
-                <p class="section-subtitle">We provide the best car rental experience</p>
-            </div>
-            <div class="row g-4">
-                <div class="col-md-3 col-sm-6">
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-car-side"></i>
-                        </div>
-                        <h3>Wide Vehicle Selection</h3>
-                        <p>Choose from SUVs, Sedans, Luxury cars, and more</p>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-tag"></i>
-                        </div>
-                        <h3>Affordable Pricing</h3>
-                        <p>Best rates with no hidden fees</p>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </div>
-                        <h3>Multiple Locations</h3>
-                        <p>Convenient pickup points across the city</p>
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-lock"></i>
-                        </div>
-                        <h3>Secure Booking</h3>
-                        <p>Safe and encrypted transactions</p>
-                    </div>
+        <!-- Stats Banner -->
+        <div class="stats-banner">
+            <div class="container">
+                <div class="row" id="statsContainer">
+                    <!-- Stats loaded via AJAX -->
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- Vehicle Listing Section -->
-    <section id="vehicles" class="py-5">
-        <div class="container">
-            <div class="text-center">
-                <h2 class="section-title">Our Fleet</h2>
-                <p class="section-subtitle">Choose from our wide selection of quality vehicles</p>
-            </div>
-            <div class="row g-4">
-                <div class="col-lg-4 col-md-6">
-                    <div class="vehicle-card">
-                        <div class="vehicle-image">
-                            <img src="https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=600" alt="Toyota Fortuner">
-                        </div>
-                        <div class="vehicle-info">
-                            <h3 class="vehicle-title">Toyota Fortuner</h3>
-                            <p class="vehicle-type"><i class="fas fa-suv"></i> SUV • 7 Seater</p>
-                            <div class="vehicle-price">₱3,500 <span>/ day</span></div>
-                            <button class="btn btn-primary-custom w-100">Book Now</button>
-                        </div>
-                    </div>
+        <!-- Features Section -->
+        <section class="py-5" style="background: var(--bg-light);">
+            <div class="container">
+                <div class="text-center">
+                    <h2 class="section-title">Why Choose Us</h2>
+                    <p class="section-subtitle">We provide the best car rental experience</p>
                 </div>
-                <div class="col-lg-4 col-md-6">
-                    <div class="vehicle-card">
-                        <div class="vehicle-image">
-                            <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=600" alt="Honda Civic">
-                        </div>
-                        <div class="vehicle-info">
-                            <h3 class="vehicle-title">Honda Civic</h3>
-                            <p class="vehicle-type"><i class="fas fa-car"></i> Sedan • 5 Seater</p>
-                            <div class="vehicle-price">₱2,500 <span>/ day</span></div>
-                            <button class="btn btn-primary-custom w-100">Book Now</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6">
-                    <div class="vehicle-card">
-                        <div class="vehicle-image">
-                            <img src="https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=600" alt="Mitsubishi Montero">
-                        </div>
-                        <div class="vehicle-info">
-                            <h3 class="vehicle-title">Mitsubishi Montero</h3>
-                            <p class="vehicle-type"><i class="fas fa-suv"></i> SUV • 7 Seater</p>
-                            <div class="vehicle-price">₱3,800 <span>/ day</span></div>
-                            <button class="btn btn-primary-custom w-100">Book Now</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6">
-                    <div class="vehicle-card">
-                        <div class="vehicle-image">
-                            <img src="https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?w=600" alt="Toyota Vios">
-                        </div>
-                        <div class="vehicle-info">
-                            <h3 class="vehicle-title">Toyota Vios</h3>
-                            <p class="vehicle-type"><i class="fas fa-car"></i> Sedan • 5 Seater</p>
-                            <div class="vehicle-price">₱1,800 <span>/ day</span></div>
-                            <button class="btn btn-primary-custom w-100">Book Now</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6">
-                    <div class="vehicle-card">
-                        <div class="vehicle-image">
-                            <img src="https://images.unsplash.com/photo-1553440569-bcc63803a83d?w=600" alt="Ford Raptor">
-                        </div>
-                        <div class="vehicle-info">
-                            <h3 class="vehicle-title">Ford Raptor</h3>
-                            <p class="vehicle-type"><i class="fas fa-truck"></i> Pickup • 5 Seater</p>
-                            <div class="vehicle-price">₱4,500 <span>/ day</span></div>
-                            <button class="btn btn-primary-custom w-100">Book Now</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6">
-                    <div class="vehicle-card">
-                        <div class="vehicle-image">
-                            <img src="https://images.unsplash.com/photo-1580274455191-1c62238fa333?w=600" alt="Nissan Navara">
-                        </div>
-                        <div class="vehicle-info">
-                            <h3 class="vehicle-title">Nissan Navara</h3>
-                            <p class="vehicle-type"><i class="fas fa-truck"></i> Pickup • 5 Seater</p>
-                            <div class="vehicle-price">₱3,200 <span>/ day</span></div>
-                            <button class="btn btn-primary-custom w-100">Book Now</button>
-                        </div>
-                    </div>
+                <div class="row g-4" id="featuresContainer">
+                    <!-- Features loaded via AJAX -->
                 </div>
             </div>
-            <div class="text-center mt-5">
-                <button class="btn btn-outline-custom">View All Vehicles <i class="fas fa-arrow-right"></i></button>
-            </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- Special Offer Section -->
-    <section class="offer-section">
-        <div class="container">
-            <h2>Weekend Promo – 15% Off</h2>
-            <p>Book any vehicle for 3 days or more this weekend and get 15% discount!</p>
-            <button class="btn btn-accent">Claim Offer Now</button>
-        </div>
-    </section>
-
-    <!-- Testimonial Section -->
-    <section class="py-5" style="background: var(--bg-light);">
-        <div class="container">
-            <div class="text-center">
-                <h2 class="section-title">What Our Customers Say</h2>
-                <p class="section-subtitle">Trusted by thousands of happy renters</p>
-            </div>
-            <div class="row g-4">
-                <div class="col-md-4">
-                    <div class="testimonial-card">
-                        <img src="https://randomuser.me/api/portraits/women/1.jpg" alt="Customer" class="testimonial-image">
-                        <h4>Maria Santos</h4>
-                        <div class="rating">
-                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
-                        </div>
-                        <p class="testimonial-text">"Great service! The car was clean and the booking process was super easy. Highly recommend!"</p>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="testimonial-card">
-                        <img src="https://randomuser.me/api/portraits/men/2.jpg" alt="Customer" class="testimonial-image">
-                        <h4>John Dela Cruz</h4>
-                        <div class="rating">
-                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
-                        </div>
-                        <p class="testimonial-text">"Affordable rates and friendly staff. Will definitely rent again from TCRCJ!"</p>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="testimonial-card">
-                        <img src="https://randomuser.me/api/portraits/women/3.jpg" alt="Customer" class="testimonial-image">
-                        <h4>Anna Reyes</h4>
-                        <div class="rating">
-                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
-                        </div>
-                        <p class="testimonial-text">"The vehicle was in perfect condition. Best car rental experience I've had!"</p>
-                    </div>
-                </div>
+        <!-- CTA Banner -->
+        <div class="cta-banner">
+            <div class="container">
+                <h2>Ready to Hit the Road?</h2>
+                <p>Experience the freedom of the open road with our premium vehicles</p>
+                <button class="btn btn-cta" id="ctaBookNowBtn">
+                    <i class="fas fa-calendar-check"></i> Book Your Ride Now
+                </button>
             </div>
         </div>
-    </section>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
@@ -725,7 +621,7 @@ if (isset($_SESSION['user_id'])) {
                     <h4><i class="fas fa-car" style="color: var(--primary-green);"></i> Tagum City Rent Car Jhunrider</h4>
                     <p style="color: rgba(255,255,255,0.7);">Your trusted partner for quality car rentals. Safe, reliable, and affordable.</p>
                     <div class="social-icons">
-                        <a href="#"><i class="fab fa-facebook-f"></i></a>
+                        <a href="https://www.facebook.com/jun.natividad.58323"><i class="fab fa-facebook-f"></i></a>
                         <a href="#"><i class="fab fa-twitter"></i></a>
                         <a href="#"><i class="fab fa-instagram"></i></a>
                         <a href="#"><i class="fab fa-tiktok"></i></a>
@@ -734,10 +630,9 @@ if (isset($_SESSION['user_id'])) {
                 <div class="col-md-2 mb-4">
                     <h4>Quick Links</h4>
                     <ul class="footer-links">
-                        <li><a href="#">Home</a></li>
-                        <li><a href="#vehicles">Vehicles</a></li>
-                        <li><a href="#">About Us</a></li>
-                        <li><a href="#">Contact</a></li>
+                        <li><a href="#" data-section="home">Home</a></li>
+                        <li><a href="#" data-section="about">About Us</a></li>
+                        <li><a href="#" data-section="contact">Contact</a></li>
                     </ul>
                 </div>
                 <div class="col-md-3 mb-4">
@@ -745,7 +640,6 @@ if (isset($_SESSION['user_id'])) {
                     <ul class="footer-links">
                         <li><i class="fas fa-map-marker-alt" style="color: var(--primary-green);"></i> Tagum City, Davao del Norte</li>
                         <li><i class="fas fa-phone" style="color: var(--primary-green);"></i> +63 9486318837</li>
-                        <li><i class="fas fa-envelope" style="color: var(--primary-green);"></i> https://www.facebook.com/jun.natividad.58323</li>
                     </ul>
                 </div>
                 <div class="col-md-3 mb-4">
@@ -764,5 +658,290 @@ if (isset($_SESSION['user_id'])) {
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <script>
+$(document).ready(function() {
+    // Load all dynamic content on page load
+    loadStats();
+    loadFeatures();
+    
+    // Set up automatic refresh every 30 seconds (optional)
+    let autoRefreshInterval = setInterval(function() {
+        refreshAllContent();
+    }, 30000); // Refresh every 30 seconds
+    
+    // Handle explore button
+    $('#exploreBtn').on('click', function() {
+        const location = $('#location').val();
+        showToast('Please login to explore vehicles in ' + location + '!');
+        setTimeout(function() {
+            window.location.href = 'auth/login.php';
+        }, 1500);
+    });
+    
+    // Handle CTA book now button
+    $('#ctaBookNowBtn').on('click', function() {
+        showToast('Please login to continue booking!');
+        setTimeout(function() {
+            window.location.href = 'auth/login.php';
+        }, 1500);
+    });
+    
+    // Handle navigation clicks with AJAX
+    $('[data-section]').on('click', function(e) {
+        e.preventDefault();
+        const section = $(this).data('section');
+        loadSection(section);
+    });
+    
+    // Function to load stats via AJAX
+    function loadStats() {
+        $.ajax({
+            url: 'ajax/get_stats.php',
+            type: 'GET',
+            dataType: 'json',
+            beforeSend: function() {
+                showLoading();
+            },
+            success: function(response) {
+                if (response.success) {
+                    updateStats(response.stats);
+                } else {
+                    loadSampleStats();
+                }
+                hideLoading();
+            },
+            error: function() {
+                loadSampleStats();
+                hideLoading();
+            }
+        });
+    }
+    
+    // Function to load features via AJAX
+    function loadFeatures() {
+        $.ajax({
+            url: 'ajax/get_features.php',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    updateFeatures(response.features);
+                } else {
+                    loadSampleFeatures();
+                }
+            },
+            error: function() {
+                loadSampleFeatures();
+            }
+        });
+    }
+    
+    // Function to load different sections via AJAX
+    function loadSection(section) {
+        showLoading();
+        
+        $.ajax({
+            url: 'ajax/load_section.php',
+            type: 'POST',
+            data: { section: section },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    $('#mainContent').html(response.content);
+                    showToast('Section loaded: ' + section);
+                } else {
+                    showToast('Error loading section', 'error');
+                }
+                hideLoading();
+            },
+            error: function() {
+                hideLoading();
+                showToast('Failed to load section', 'error');
+            }
+        });
+    }
+    
+    // Function to refresh all content
+    function refreshAllContent() {
+        loadStats();
+        loadFeatures();
+        showToast('Content refreshed automatically!', 'info');
+    }
+    
+    // Update stats display
+    function updateStats(stats) {
+        let html = '';
+        stats.forEach(stat => {
+            html += `
+                <div class="col-md-3 col-sm-6">
+                    <div class="stat-item" onclick="handleStatClick('${stat.label}')">
+                        <div class="stat-icon">
+                            <i class="${stat.icon}"></i>
+                        </div>
+                        <div class="stat-number">${stat.number}</div>
+                        <div class="stat-label">${stat.label}</div>
+                    </div>
+                </div>
+            `;
+        });
+        $('#statsContainer').html(html);
+    }
+    
+    // Update features display
+    function updateFeatures(features) {
+        let html = '';
+        features.forEach(feature => {
+            html += `
+                <div class="col-md-3 col-sm-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="${feature.icon}"></i>
+                        </div>
+                        <h3>${feature.title}</h3>
+                        <p>${feature.description}</p>
+                    </div>
+                </div>
+            `;
+        });
+        $('#featuresContainer').html(html);
+    }
+    
+    // Sample stats for fallback
+    function loadSampleStats() {
+        const sampleStats = [
+            { icon: 'fas fa-car', number: '50+', label: 'Premium Vehicles' },
+            { icon: 'fas fa-users', number: '1000+', label: 'Happy Customers' },
+            { icon: 'fas fa-clock', number: '24/7', label: 'Support Available' },
+            { icon: 'fas fa-map-marker-alt', number: '5+', label: 'Convenient Locations' }
+        ];
+        updateStats(sampleStats);
+    }
+    
+    // Sample features for fallback
+    function loadSampleFeatures() {
+        const sampleFeatures = [
+            { icon: 'fas fa-car-side', title: 'Wide Vehicle Selection', description: 'Choose from SUVs, Sedans, Luxury cars, and more' },
+            { icon: 'fas fa-tag', title: 'Affordable Pricing', description: 'Best rates with no hidden fees' },
+            { icon: 'fas fa-map-marker-alt', title: 'Multiple Locations', description: 'Convenient pickup points across the city' },
+            { icon: 'fas fa-lock', title: 'Secure Booking', description: 'Safe and encrypted transactions' }
+        ];
+        updateFeatures(sampleFeatures);
+    }
+    
+    // Show loading overlay
+    function showLoading() {
+        $('#loadingOverlay').addClass('active');
+    }
+    
+    // Hide loading overlay
+    function hideLoading() {
+        $('#loadingOverlay').removeClass('active');
+    }
+    
+    // Show toast notification
+    function showToast(message, type = 'success') {
+        const toast = $('#toastNotification');
+        const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle');
+        $('#toastMessage').html(`<i class="fas ${icon}"></i> ${message}`);
+        toast.css('background', type === 'success' ? '#16A34A' : (type === 'error' ? '#EF4444' : '#3B82F6'));
+        toast.fadeIn(300);
+        setTimeout(function() {
+            toast.fadeOut(300);
+        }, 3000);
+    }
+    
+    // Handle stat item click
+    window.handleStatClick = function(label) {
+        showToast(`Showing information about: ${label}`);
+    };
+    
+    // Monitor for file changes (for development)
+    let lastModified = null;
+    function checkForUpdates() {
+        $.ajax({
+            url: 'ajax/check_updates.php',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.modified && response.modified !== lastModified) {
+                    lastModified = response.modified;
+                    showToast('Content has been updated! Refreshing...', 'info');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                }
+            }
+        });
+    }
+    
+    // Check for updates every 5 seconds (for development)
+    // Uncomment if you want auto-refresh when files change
+    // setInterval(checkForUpdates, 5000);
+    
+    // Manual refresh button (optional - add to page if needed)
+    // You can add a refresh button anywhere on the page
+    $('body').append('<div style="position: fixed; bottom: 20px; left: 20px; z-index: 10000;"><button id="manualRefreshBtn" class="btn btn-primary-custom" style="border-radius: 50px; padding: 10px 20px;"><i class="fas fa-sync-alt"></i> Refresh</button></div>');
+    
+    $('#manualRefreshBtn').on('click', function() {
+        refreshAllContent();
+        showToast('Content refreshed manually!');
+    });
+});
+
+// Watch for PHP file changes (requires additional setup)
+// This uses EventSource for real-time updates
+if (typeof(EventSource) !== "undefined") {
+    var source = new EventSource("ajax/live_updates.php");
+    source.onmessage = function(event) {
+        var data = JSON.parse(event.data);
+        if (data.updated) {
+            showToast('New updates available! Refreshing content...', 'info');
+            setTimeout(function() {
+                location.reload();
+            }, 1000);
+        }
+    };
+}
+</script>
+
+<!-- Create the necessary AJAX endpoint files -->
+<?php
+// This PHP code will create the AJAX endpoint files automatically
+// Create ajax directory if it doesn't exist
+if (!file_exists('ajax')) {
+    mkdir('ajax', 0777, true);
+}
+
+// Create get_stats.php
+$get_stats = '<?php
+header("Content-Type: application/json");
+// Sample stats data - replace with database queries
+$stats = [
+    ["icon" => "fas fa-car", "number" => "50+", "label" => "Premium Vehicles"],
+    ["icon" => "fas fa-users", "number" => "1000+", "label" => "Happy Customers"],
+    ["icon" => "fas fa-clock", "number" => "24/7", "label" => "Support Available"],
+    ["icon" => "fas fa-map-marker-alt", "number" => "5+", "label" => "Convenient Locations"]
+];
+echo json_encode(["success" => true, "stats" => $stats]);
+?>';
+file_put_contents('ajax/get_stats.php', $get_stats);
+
+// Create get_features.php
+$get_features = '<?php
+header("Content-Type: application/json");
+$features = [
+    ["icon" => "fas fa-car-side", "title" => "Wide Vehicle Selection", "description" => "Choose from SUVs, Sedans, Luxury cars, and more"],
+    ["icon" => "fas fa-tag", "title" => "Affordable Pricing", "description" => "Best rates with no hidden fees"],
+    ["icon" => "fas fa-map-marker-alt", "title" => "Multiple Locations", "description" => "Convenient pickup points across the city"],
+    ["icon" => "fas fa-lock", "title" => "Secure Booking", "description" => "Safe and encrypted transactions"]
+];
+echo json_encode(["success" => true, "features" => $features]);
+?>';
+file_put_contents('ajax/get_features.php', $get_features);
+
+echo "<!-- AJAX endpoints created successfully -->";
+?>
 </body>
 </html>

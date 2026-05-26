@@ -7,152 +7,199 @@ if (!isAdmin()) {
     redirect(BASE_URL . 'auth/login.php');
 }
 
-$report_id = $_GET['id'] ?? null;
+$report_id = $_GET['id'] ?? 0;
 
-if (!$report_id) {
-    redirect(BASE_URL . 'admin/damage-reports.php');
-}
-
-// Get damage report
+// Get report details
 $stmt = $pdo->prepare("
-    SELECT dr.*, r.rental_id, v.model, v.plate_number, u.name, u.email, c.damage_incidents_count
+    SELECT 
+        dr.*,
+        r.rental_id,
+        r.pickup_date,
+        r.return_date,
+        r.status as rental_status,
+        u.name as customer_name,
+        u.email as customer_email,
+        u.phone as customer_phone,
+        v.model as vehicle_model,
+        v.plate_number,
+        v.type as vehicle_type,
+        v.year as vehicle_year
     FROM damage_reports dr
     JOIN rentals r ON dr.rental_id = r.rental_id
-    JOIN vehicles v ON dr.vehicle_id = v.vehicle_id
-    JOIN customers c ON dr.customer_id = c.customer_id
-    JOIN users u ON c.user_id = u.id
+    JOIN users u ON r.user_id = u.id
+    JOIN vehicles v ON r.vehicle_id = v.vehicle_id
     WHERE dr.report_id = ?
 ");
 $stmt->execute([$report_id]);
-$report = $stmt->fetch();
+$report = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$report) {
-    redirect(BASE_URL . 'admin/damage-reports.php');
+    redirect('damage-reports.php');
 }
-
-// Get rental photos for comparison
-$stmt = $pdo->prepare("SELECT * FROM rental_photos WHERE rental_id = ? ORDER BY type, uploaded_at");
-$stmt->execute([$report['rental_id']]);
-$photos = $stmt->fetchAll();
 ?>
 
 <?php require_once '../includes/admin-sidebar.php'; ?>
 
 <div class="main-content">
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <a href="damage-reports.php" class="btn btn-secondary mb-3"><i class="fas fa-arrow-left"></i> Back</a>
-            <h1><i class="fas fa-exclamation-triangle"></i> Damage Report #<?php echo $report['report_id']; ?></h1>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-8">
-            <!-- Report Details -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Report Information</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted">Report Date</label>
-                            <p><?php echo date('M d, Y h:i A', strtotime($report['report_date'])); ?></p>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted">Severity</label>
-                            <p><span class="badge badge-<?php echo $report['severity']; ?>"><?php echo ucfirst($report['severity']); ?></span></p>
-                        </div>
-                        <div class="col-md-12 mb-3">
-                            <label class="form-label text-muted">Description</label>
-                            <p><?php echo htmlspecialchars($report['description']); ?></p>
-                        </div>
-                        <div class="col-md-12 mb-0">
-                            <label class="form-label text-muted">Admin Notes</label>
-                            <p><?php echo htmlspecialchars($report['admin_notes'] ?? 'No notes'); ?></p>
-                        </div>
-                    </div>
-                </div>
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <h1><i class="fas fa-exclamation-triangle"></i> Damage Report Details</h1>
+                <p class="text-muted">View complete damage report information</p>
             </div>
-
-            <!-- Vehicle & Rental Info -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Vehicle & Rental Information</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted">Vehicle</label>
-                            <p><?php echo htmlspecialchars($report['model']); ?></p>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted">Plate Number</label>
-                            <p><?php echo htmlspecialchars($report['plate_number']); ?></p>
-                        </div>
-                        <div class="col-md-12 mb-0">
-                            <label class="form-label text-muted">Rental ID</label>
-                            <p><a href="rental-details.php?id=<?php echo $report['rental_id']; ?>" class="btn btn-sm btn-secondary">View Rental #<?php echo $report['rental_id']; ?></a></p>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-md-4 text-end">
+                <a href="damage-reports.php" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Reports
+                </a>
             </div>
-
-            <!-- Photos Comparison -->
-            <?php if (count($photos) > 0): ?>
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-images"></i> Before & After Photos</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="photo-grid">
-                            <?php foreach ($photos as $photo): ?>
-                                <div class="photo-item">
-                                    <img src="<?php echo BASE_URL . htmlspecialchars($photo['image_path']); ?>" alt="Photo">
-                                    <span class="photo-label"><?php echo ucfirst($photo['type']); ?></span>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            <?php endif; ?>
         </div>
 
-        <div class="col-md-4">
-            <!-- Customer Info -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Customer Information</h5>
-                </div>
-                <div class="card-body">
-                    <p class="mb-2">
-                        <strong>Name:</strong><br>
-                        <?php echo htmlspecialchars($report['name']); ?>
-                    </p>
-                    <p class="mb-2">
-                        <strong>Email:</strong><br>
-                        <?php echo htmlspecialchars($report['email']); ?>
-                    </p>
-                    <hr>
-                    <p class="mb-0">
-                        <strong>Total Damage Incidents:</strong><br>
-                        <span class="badge badge-<?php echo $report['damage_incidents_count'] > 2 ? 'danger' : ($report['damage_incidents_count'] > 0 ? 'warning' : 'success'); ?>">
-                            <?php echo $report['damage_incidents_count']; ?>
-                        </span>
-                    </p>
-                </div>
-            </div>
-
-            <!-- Alert Badge -->
-            <?php if ($report['damage_incidents_count'] > 2): ?>
-                <div class="card border-danger">
+        <div class="row">
+            <!-- Report Information -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
                     <div class="card-header bg-danger text-white">
-                        <h5 class="mb-0"><i class="fas fa-user-shield"></i> Repeat Offender Alert</h5>
+                        <h5 class="mb-0"><i class="fas fa-file-alt"></i> Report Information</h5>
                     </div>
                     <div class="card-body">
-                        <p class="mb-0">This customer has <strong><?php echo $report['damage_incidents_count']; ?> damage incidents</strong>. Consider requiring a higher deposit or additional insurance for future rentals.</p>
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="35%">Report ID:</th>
+                                <td>#<?php echo $report['report_id']; ?></td>
+                            </tr>
+                            <tr>
+                                <th>Report Date:</th>
+                                <td><?php echo date('F d, Y h:i A', strtotime($report['report_date'])); ?></td>
+                            </tr>
+                            <tr>
+                                <th>Severity:</th>
+                                <td>
+                                    <span class="badge bg-<?php 
+                                        echo $report['severity'] == 'high' ? 'danger' : 
+                                            ($report['severity'] == 'medium' ? 'warning' : 'info'); 
+                                    ?>">
+                                        <?php echo ucfirst($report['severity']); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                 </div>
+            </div>
+
+            <!-- Rental Information -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-calendar-check"></i> Rental Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="35%">Rental ID:</th>
+                                <td>#<?php echo $report['rental_id']; ?></td>
+                            </tr>
+                            <tr>
+                                <th>Pickup Date:</th>
+                                <td><?php echo date('F d, Y', strtotime($report['pickup_date'])); ?></td>
+                            </tr>
+                            <tr>
+                                <th>Return Date:</th>
+                                <td><?php echo date('F d, Y', strtotime($report['return_date'])); ?></td>
+                            </tr>
+                            <tr>
+                                <th>Rental Status:</th>
+                                <td>
+                                    <span class="badge bg-<?php 
+                                        echo $report['rental_status'] == 'active' ? 'success' : 'secondary'; 
+                                    ?>">
+                                        <?php echo ucfirst($report['rental_status']); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Information -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-user"></i> Customer Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="35%">Name:</th>
+                                <td><?php echo htmlspecialchars($report['customer_name']); ?></td>
+                            </tr>
+                            <tr>
+                                <th>Email:</th>
+                                <td><?php echo htmlspecialchars($report['customer_email']); ?></td>
+                            </tr>
+                            <tr>
+                                <th>Phone:</th>
+                                <td><?php echo htmlspecialchars($report['customer_phone'] ?? 'N/A'); ?></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vehicle Information -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-car"></i> Vehicle Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="35%">Model:</th>
+                                <td><?php echo htmlspecialchars($report['vehicle_model']); ?></td>
+                            </tr>
+                            <tr>
+                                <th>Plate Number:</th>
+                                <td><?php echo htmlspecialchars($report['plate_number']); ?></td>
+                            </tr>
+                            <tr>
+                                <th>Type:</th>
+                                <td><?php echo htmlspecialchars($report['vehicle_type']); ?></td>
+                            </tr>
+                            <tr>
+                                <th>Year:</th>
+                                <td><?php echo $report['vehicle_year']; ?></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Damage Description -->
+            <div class="col-md-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0"><i class="fas fa-tools"></i> Damage Description</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><?php echo nl2br(htmlspecialchars($report['description'])); ?></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Notes -->
+            <?php if ($report['admin_notes']): ?>
+            <div class="col-md-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-sticky-note"></i> Admin Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><?php echo nl2br(htmlspecialchars($report['admin_notes'])); ?></p>
+                    </div>
+                </div>
+            </div>
             <?php endif; ?>
         </div>
     </div>

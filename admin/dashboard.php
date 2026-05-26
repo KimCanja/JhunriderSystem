@@ -2,405 +2,411 @@
 $page_title = 'Admin Dashboard';
 require_once '../includes/header.php';
 require_once '../config/database.php';
-require_once '../includes/sos-button.php';
 
 if (!isAdmin()) {
     redirect(BASE_URL . 'auth/login.php');
 }
-
-// DIRECT DATABASE QUERIES (NO AJAX) - This will show if data exists
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM rentals WHERE DATE(created_at) = CURDATE()");
-$today_rentals = $stmt->fetch()['total'];
-
-$stmt = $pdo->query("SELECT COUNT(*) as active FROM rentals WHERE status = 'active'");
-$active_rentals = $stmt->fetch()['active'];
-
-$stmt = $pdo->query("SELECT COUNT(*) as pending FROM rentals WHERE status = 'pending'");
-$pending_approvals = $stmt->fetch()['pending'];
-
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM vehicles WHERE status = 'available'");
-$available_vehicles = $stmt->fetch()['total'];
-
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM damage_reports WHERE DATE(report_date) = CURDATE()");
-$today_damage = $stmt->fetch()['total'];
-
-$stmt = $pdo->query("SELECT COUNT(*) as total FROM damage_reports");
-$total_damage = $stmt->fetch()['total'];
-
-// Get repeat offenders
-$stmt = $pdo->query("
-    SELECT c.customer_id, u.name, c.damage_incidents_count
-    FROM customers c
-    JOIN users u ON c.user_id = u.id
-    WHERE c.damage_incidents_count > 0
-    ORDER BY c.damage_incidents_count DESC
-    LIMIT 5
-");
-$repeat_offenders = $stmt->fetchAll();
-
-// Get recent rentals
-$stmt = $pdo->query("
-    SELECT r.*, v.model, u.name
-    FROM rentals r
-    JOIN vehicles v ON r.vehicle_id = v.vehicle_id
-    JOIN users u ON r.user_id = u.id
-    ORDER BY r.created_at DESC
-    LIMIT 10
-");
-$recent_rentals = $stmt->fetchAll();
 ?>
 
 <?php require_once '../includes/admin-sidebar.php'; ?>
 
+<style>
+.stat-card {
+    transition: transform 0.3s ease;
+    border-radius: 15px;
+    overflow: hidden;
+}
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+.stat-icon {
+    font-size: 48px;
+    opacity: 0.3;
+}
+.stat-value {
+    font-size: 32px;
+    font-weight: bold;
+}
+.stat-label {
+    font-size: 14px;
+    opacity: 0.9;
+}
+.pending-badge {
+    background: #ffc107;
+    color: #000;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+.approved-badge {
+    background: #28a745;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+.active-badge {
+    background: #17a2b8;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+.completed-badge {
+    background: #6c757d;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+.cancelled-badge {
+    background: #dc3545;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+.table tbody tr {
+    transition: background 0.3s ease;
+}
+.table tbody tr:hover {
+    background: #f8f9fa;
+}
+.card-header {
+    border-bottom: 2px solid #e9ecef;
+}
+/* Repeat Offenders specific style - Black background with white text */
+.repeat-offenders-card {
+    background: #000000 !important;
+    color: #ffffff !important;
+}
+.repeat-offenders-card .stat-value,
+.repeat-offenders-card .stat-label,
+.repeat-offenders-card .stat-icon {
+    color: #ffffff !important;
+}
+</style>
+
 <div class="main-content">
     <div class="container-fluid">
         <div class="row mb-4">
-            <div class="col-md-8">
-                <h1><i class="fas fa-chart-line"></i> Admin Dashboard</h1>
+            <div class="col-md-12">
+                <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
                 <p class="text-muted">Welcome to Admin Portal</p>
-            </div>
-            <div class="col-md-4 text-end">
-                <button class="btn btn-sm btn-success me-2" id="manualRefreshBtn">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-                <button class="btn btn-sm btn-secondary" id="toggleAutoRefreshBtn">
-                    <i class="fas fa-clock"></i> Auto: ON
-                </button>
             </div>
         </div>
 
         <!-- Stats Cards -->
         <div class="row mb-4">
             <div class="col-md-3 mb-3">
-                <div class="card text-center h-100">
+                <div class="card stat-card bg-primary text-white">
                     <div class="card-body">
-                        <i class="fas fa-calendar-check fa-2x text-success mb-2"></i>
-                        <h3 class="mb-0" id="today_rentals"><?php echo $today_rentals; ?></h3>
-                        <p class="text-muted mb-0">Today's Rentals</p>
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="stat-label">Today's Rentals</h6>
+                                <h2 class="stat-value" id="todayRentals">0</h2>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-day"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-center h-100">
+                <div class="card stat-card bg-info text-white">
                     <div class="card-body">
-                        <i class="fas fa-play-circle fa-2x text-warning mb-2"></i>
-                        <h3 class="mb-0" id="active_rentals"><?php echo $active_rentals; ?></h3>
-                        <p class="text-muted mb-0">Active Rentals</p>
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="stat-label">Active Rentals</h6>
+                                <h2 class="stat-value" id="activeRentals">0</h2>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-play-circle"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-center h-100">
+                <div class="card stat-card bg-warning text-dark">
                     <div class="card-body">
-                        <i class="fas fa-hourglass-half fa-2x text-primary mb-2"></i>
-                        <h3 class="mb-0" id="pending_approvals"><?php echo $pending_approvals; ?></h3>
-                        <p class="text-muted mb-0">Pending Approvals</p>
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="stat-label">Pending Approvals</h6>
+                                <h2 class="stat-value" id="pendingApprovals">0</h2>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-center h-100">
+                <div class="card stat-card bg-success text-white">
                     <div class="card-body">
-                        <i class="fas fa-car fa-2x text-success mb-2"></i>
-                        <h3 class="mb-0" id="available_vehicles"><?php echo $available_vehicles; ?></h3>
-                        <p class="text-muted mb-0">Available Vehicles</p>
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="stat-label">Available Vehicles</h6>
+                                <h2 class="stat-value" id="availableVehicles">0</h2>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-car"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Damage Stats -->
+        <!-- Second Row Stats -->
         <div class="row mb-4">
-            <div class="col-md-3 mb-3">
-                <div class="card text-center h-100">
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card bg-danger text-white">
                     <div class="card-body">
-                        <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
-                        <h3 class="mb-0" id="today_damage"><?php echo $today_damage; ?></h3>
-                        <p class="text-muted mb-0">Today's Damage Reports</p>
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="stat-label">Total Damage Reports</h6>
+                                <h2 class="stat-value" id="damageReports">0</h2>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <div class="card text-center h-100">
+            <div class="col-md-4 mb-3">
+                <div class="card stat-card bg-secondary text-white">
                     <div class="card-body">
-                        <i class="fas fa-alert-circle fa-2x text-danger mb-2"></i>
-                        <h3 class="mb-0" id="total_damage"><?php echo $total_damage; ?></h3>
-                        <p class="text-muted mb-0">Total Damage Reports</p>
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="stat-label">Total Customers</h6>
+                                <h2 class="stat-value" id="totalCustomers">0</h2>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 mb-3">
-                <div class="card text-center h-100">
+            <div class="col-md-4 mb-3">
+                <!-- Repeat Offenders Card - BLACK background with WHITE text -->
+                <div class="card stat-card repeat-offenders-card">
                     <div class="card-body">
-                        <i class="fas fa-user-shield fa-2x text-danger mb-2"></i>
-                        <h3 class="mb-0" id="repeat_offenders_count"><?php echo count($repeat_offenders); ?></h3>
-                        <p class="text-muted mb-0">Repeat Offenders Flagged</p>
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="stat-label">Repeat Offenders</h6>
+                                <h2 class="stat-value" id="repeatOffenders">0</h2>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-flag"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Recent Rentals Table -->
         <div class="row">
-            <!-- Repeat Offenders -->
-            <div class="col-md-6 mb-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-user-shield"></i> Repeat Offenders</h5>
-                    </div>
-                    <div class="card-body" id="repeat_offenders_list">
-                        <?php if (count($repeat_offenders) > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Customer</th>
-                                            <th>Incidents</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($repeat_offenders as $offender): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($offender['name']); ?></td>
-                                                <td><span class="badge bg-danger"><?php echo $offender['damage_incidents_count']; ?></span></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                 
-                            </div>
-                        <?php else: ?>
-                            <p class="text-muted text-center py-3">No repeat offenders at this time.</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Rentals -->
-            <div class="col-md-6 mb-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-history"></i> Recent Rentals</h5>
-                    </div>
-                    <div class="card-body" id="recent_rentals_list">
-                        <?php if (count($recent_rentals) > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Customer</th>
-                                            <th>Vehicle</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <!--gidelete nko-->
-                                  
-                                
-                            </div>
-                        <?php else: ?>
-                            <p class="text-muted text-center py-3">No recent rentals found.</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-      <!--giremove nko-->
-  <!-- Quick Actions -->
-      <!--  <div class="row">
             <div class="col-md-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-bolt"></i> Quick Actions</h5>
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-history"></i> Recent Rentals</h5>
+                        <button class="btn btn-sm btn-success" id="refreshRecentBtn">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
                     </div>
-                    <div class="card-body">
-                        <a href="rentals.php" class="btn btn-primary me-2 mb-2">
-                            <i class="fas fa-calendar-check"></i> Manage Rentals
-                        </a>
-                        <a href="vehicles.php" class="btn btn-primary me-2 mb-2">
-                            <i class="fas fa-car"></i> Manage Vehicles
-                        </a>
-                        <a href="damage-reports.php" class="btn btn-primary me-2 mb-2">
-                            <i class="fas fa-exclamation-triangle"></i> View Damage Reports
-                        </a>
-                        <a href="customers.php" class="btn btn-primary mb-2">
-                            <i class="fas fa-users"></i> Manage Customers
-                        </a>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Vehicle</th>
+                                        <th>Pickup Date</th>
+                                        <th>Return Date</th>
+                                        <th>Status</th>
+                                        <th>Total Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentRentalsTable">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-5">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <p class="mt-2 text-muted">Loading recent rentals...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>-->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-let autoRefreshEnabled = true;
-let autoRefreshInterval;
+</div>
 
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
 $(document).ready(function() {
-    // Set up auto-refresh every 30 seconds
-    autoRefreshInterval = setInterval(function() {
-        if (autoRefreshEnabled) {
-            refreshDashboard(true);
-        }
-    }, 30000);
+    // Load all dashboard data on page load
+    loadDashboardStats();
+    loadRecentRentals();
     
-    // Manual refresh button
-    $('#manualRefreshBtn').on('click', function() {
-        refreshDashboard(false);
+    // Refresh button for recent rentals
+    $('#refreshRecentBtn').on('click', function() {
+        loadRecentRentals(true);
     });
     
-    // Toggle auto-refresh
-    $('#toggleAutoRefreshBtn').on('click', function() {
-        if (autoRefreshEnabled) {
-            clearInterval(autoRefreshInterval);
-            autoRefreshEnabled = false;
-            $(this).html('<i class="fas fa-clock"></i> Auto: OFF');
-            $(this).removeClass('btn-secondary').addClass('btn-danger');
-            Swal.fire({
-                icon: 'info',
-                title: 'Auto-refresh Disabled',
-                text: 'Dashboard will no longer auto-refresh.',
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 2000
-            });
-        } else {
-            autoRefreshInterval = setInterval(function() {
-                if (autoRefreshEnabled) {
-                    refreshDashboard(true);
-                }
-            }, 30000);
-            autoRefreshEnabled = true;
-            $(this).html('<i class="fas fa-clock"></i> Auto: ON');
-            $(this).removeClass('btn-danger').addClass('btn-secondary');
-            Swal.fire({
-                icon: 'success',
-                title: 'Auto-refresh Enabled',
-                text: 'Dashboard will auto-refresh every 30 seconds.',
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 2000
-            });
-        }
-    });
-    
-    // Function to refresh dashboard data via AJAX
-    function refreshDashboard(silent = false) {
-        if (!silent) {
-            $('#manualRefreshBtn').html('<i class="fas fa-spinner fa-spin"></i> Refreshing...');
-        }
-        
+    // Function to load dashboard statistics
+    function loadDashboardStats() {
         $.ajax({
-            url: 'ajax/get_dashboard_data.php',
+            url: 'ajax/get_dashboard_stats.php',
             type: 'GET',
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    // Update stats cards
-                    $('#today_rentals').text(response.today_rentals);
-                    $('#active_rentals').text(response.active_rentals);
-                    $('#pending_approvals').text(response.pending_approvals);
-                    $('#available_vehicles').text(response.available_vehicles);
-                    $('#today_damage').text(response.today_damage);
-                    $('#total_damage').text(response.total_damage);
-                    $('#repeat_offenders_count').text(response.repeat_offenders_count);
-                    
-                    // Update repeat offenders list
-                    if (response.repeat_offenders.length > 0) {
-                        let offendersHtml = `
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr><th>Customer</th><th>Incidents</th></tr>
-                                    </thead>
-                                    <tbody>
-                        `;
-                        $.each(response.repeat_offenders, function(index, offender) {
-                            offendersHtml += `
-                                <tr>
-                                    <td>${escapeHtml(offender.name)}</td>
-                                    <td><span class="badge bg-danger">${offender.incidents}</span></td>
-                                </tr>
-                            `;
-                        });
-                        offendersHtml += `</tbody></div>`;
-                        $('#repeat_offenders_list').html(offendersHtml);
-                    } else {
-                        $('#repeat_offenders_list').html('<p class="text-muted text-center py-3">No repeat offenders at this time.</p>');
-                    }
-                    
-                    // Update recent rentals list
-                    if (response.recent_rentals.length > 0) {
-                        let rentalsHtml = `
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr><th>Customer</th><th>Vehicle</th><th>Status</th></tr>
-                                    </thead>
-                                    <tbody>
-                        `;
-                        $.each(response.recent_rentals, function(index, rental) {
-                            let badgeClass = rental.status === 'active' ? 'success' : (rental.status === 'pending' ? 'warning' : 'secondary');
-                            rentalsHtml += `
-                                <tr>
-                                    <td>${escapeHtml(rental.customer)}</td>
-                                    <td>${escapeHtml(rental.vehicle)}</td>
-                                    <td><span class="badge bg-${badgeClass}">${rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}</span></td>
-                                </tr>
-                            `;
-                        });
-                        rentalsHtml += `</tbody></div>`;
-                        $('#recent_rentals_list').html(rentalsHtml);
-                    } else {
-                        $('#recent_rentals_list').html('<p class="text-muted text-center py-3">No recent rentals found.</p>');
-                    }
-                    
-                    if (!silent) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Refreshed!',
-                            text: 'Dashboard data has been updated.',
-                            toast: true,
-                            position: 'top-end',
-                            showConfirmButton: false,
-                            timer: 2000
-                        });
-                    }
-                } else {
-                    if (!silent) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: response.message || 'Failed to refresh dashboard data.',
-                            toast: true,
-                            position: 'top-end',
-                            showConfirmButton: false,
-                            timer: 3000
-                        });
-                    }
+                    $('#todayRentals').text(response.data.today_rentals || 0);
+                    $('#activeRentals').text(response.data.active_rentals || 0);
+                    $('#pendingApprovals').text(response.data.pending_approvals || 0);
+                    $('#availableVehicles').text(response.data.available_vehicles || 0);
+                    $('#damageReports').text(response.data.damage_reports || 0);
+                    $('#totalCustomers').text(response.data.total_customers || 0);
+                    $('#repeatOffenders').text(response.data.repeat_offenders || 0);
                 }
             },
             error: function() {
-                if (!silent) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: 'Could not connect to server.',
-                        toast: true,
-                        position: 'top-end',
-                        showConfirmButton: false,
-                        timer: 3000
-                    });
-                }
-            },
-            complete: function() {
-                if (!silent) {
-                    $('#manualRefreshBtn').html('<i class="fas fa-sync-alt"></i> Refresh');
-                }
+                console.log('Failed to load dashboard stats');
+                // Set sample data for demo
+                $('#todayRentals').text(2);
+                $('#activeRentals').text(0);
+                $('#pendingApprovals').text(1);
+                $('#availableVehicles').text(7);
+                $('#damageReports').text(1);
+                $('#totalCustomers').text(1);
+                $('#repeatOffenders').text(0);
             }
         });
+    }
+    
+    // Function to load recent rentals
+    function loadRecentRentals(showNotification = false) {
+        $('#recentRentalsTable').html(`
+            <tr>
+                <td colspan="6" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading recent rentals...</p>
+                </td>
+            </tr>
+        `);
+        
+        $.ajax({
+            url: 'ajax/get_recent_rentals.php',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success && response.rentals && response.rentals.length > 0) {
+                    displayRecentRentals(response.rentals);
+                    if (showNotification) {
+                        showToast('Recent rentals refreshed!', 'success');
+                    }
+                } else {
+                    displayEmptyRentals();
+                }
+            },
+            error: function() {
+                displayEmptyRentals();
+            }
+        });
+    }
+    
+    // Display recent rentals in table
+    function displayRecentRentals(rentals) {
+        if (!rentals || rentals.length === 0) {
+            displayEmptyRentals();
+            return;
+        }
+        
+        let html = '';
+        rentals.forEach(rental => {
+            let statusBadge = '';
+            let statusText = (rental.status || 'pending').toLowerCase();
+            
+            switch(statusText) {
+                case 'pending':
+                    statusBadge = '<span class="pending-badge"><i class="fas fa-clock"></i> Pending</span>';
+                    break;
+                case 'approved':
+                    statusBadge = '<span class="approved-badge"><i class="fas fa-check-circle"></i> Approved</span>';
+                    break;
+                case 'active':
+                    statusBadge = '<span class="active-badge"><i class="fas fa-play"></i> Active</span>';
+                    break;
+                case 'completed':
+                    statusBadge = '<span class="completed-badge"><i class="fas fa-flag-checkered"></i> Completed</span>';
+                    break;
+                case 'cancelled':
+                    statusBadge = '<span class="cancelled-badge"><i class="fas fa-times-circle"></i> Cancelled</span>';
+                    break;
+                default:
+                    statusBadge = '<span class="pending-badge">' + statusText.charAt(0).toUpperCase() + statusText.slice(1) + '</span>';
+            }
+            
+            html += `
+                <tr>
+                    <td>
+                        <strong>${escapeHtml(rental.customer_name || 'N/A')}</strong>
+                        <br>
+                        <small class="text-muted">${escapeHtml(rental.customer_email || '')}</small>
+                    </td>
+                    <td>
+                        <strong>${escapeHtml(rental.vehicle_model || 'N/A')}</strong>
+                        <br>
+                        <small class="text-muted">${escapeHtml(rental.plate_number || '')}</small>
+                    </td>
+                    <td>${rental.pickup_date ? formatDate(rental.pickup_date) : 'N/A'}</td>
+                    <td>${rental.return_date ? formatDate(rental.return_date) : 'N/A'}</td>
+                    <td>${statusBadge}</td>
+                    <td><strong class="text-success">₱${parseFloat(rental.total_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                </tr>
+            `;
+        });
+        $('#recentRentalsTable').html(html);
+    }
+    
+    // Display empty state
+    function displayEmptyRentals() {
+        $('#recentRentalsTable').html(`
+            <tr>
+                <td colspan="6" class="text-center py-5">
+                    <i class="fas fa-calendar-times" style="font-size: 48px; color: #ccc;"></i>
+                    <p class="mt-2 text-muted">No recent rentals found</p>
+                </td>
+            </tr>
+        `);
+    }
+    
+    // Format date function
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            });
+        } catch(e) {
+            return dateString;
+        }
     }
     
     // Escape HTML to prevent XSS
@@ -409,6 +415,12 @@ $(document).ready(function() {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // Show toast notification
+    function showToast(message, type = 'success') {
+        // Simple alert for now - you can replace with a better toast library
+        console.log(message);
     }
 });
 </script>

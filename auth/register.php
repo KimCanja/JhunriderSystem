@@ -61,8 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->beginTransaction();
                 
                 // Insert user (not verified yet)
-               $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, is_verified) VALUES (?, ?, ?, ?, FALSE)");
-$stmt->execute([$name, $email, $plain_password, $role]);
+                $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, is_verified) VALUES (?, ?, ?, ?, FALSE)");
+                $stmt->execute([$name, $email, $plain_password, $role]);
                 
                 $user_id = $pdo->lastInsertId();
 
@@ -320,7 +320,29 @@ $stmt->execute([$name, $email, $plain_password, $role]);
             background: var(--charcoal-deep);
             transition: all 0.3s ease;
             width: 100%;
-            color: white;
+            color: var(--white) !important;  /* CHANGED: Force white text */
+        }
+
+        /* Ensure input text is white when typing */
+        .form-control:focus {
+            border-color: var(--primary-green);
+            background: var(--charcoal);
+            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+            outline: none;
+            color: var(--white) !important;  /* CHANGED: Keep white on focus */
+        }
+
+        /* Ensure input text stays white when autofilled */
+        .form-control:-webkit-autofill,
+        .form-control:-webkit-autofill:focus {
+            -webkit-text-fill-color: white !important;
+            -webkit-box-shadow: 0 0 0px 1000px var(--charcoal-deep) inset !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted);
+            opacity: 0.6;
         }
 
         /* Padding for fields with left icon */
@@ -332,18 +354,6 @@ $stmt->execute([$name, $email, $plain_password, $role]);
         .input-wrapper.password-field .form-control {
             padding-left: 42px;
             padding-right: 42px;
-        }
-
-        .form-control:focus {
-            border-color: var(--primary-green);
-            background: var(--charcoal);
-            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
-            outline: none;
-        }
-
-        .form-control::placeholder {
-            color: var(--text-muted);
-            opacity: 0.6;
         }
 
         /* Customer Info Box */

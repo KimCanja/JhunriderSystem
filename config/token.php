@@ -14,8 +14,8 @@ function storeVerificationToken($pdo, $userId, $token, $code) {
     $stmt = $pdo->prepare("DELETE FROM email_verifications WHERE user_id = ?");
     $stmt->execute([$userId]);
     
-    // Set expiry to 24 hours from now
-    $expiresAt = date('Y-m-d H:i:s', strtotime('+24 hours'));
+    // Set expiry to 15 MINUTES from now
+    $expiresAt = date('Y-m-d H:i:s', strtotime('+15 minutes'));
     
     // Insert new token
     $stmt = $pdo->prepare("INSERT INTO email_verifications (user_id, token, code, expires_at) VALUES (?, ?, ?, ?)");
@@ -23,16 +23,41 @@ function storeVerificationToken($pdo, $userId, $token, $code) {
 }
 
 function verifyEmailCode($pdo, $code) {
+    // Debug logging
+    error_log("Verifying code: " . $code);
+    
     $stmt = $pdo->prepare("
         SELECT ev.*, u.name, u.email 
         FROM email_verifications ev 
         JOIN users u ON ev.user_id = u.id 
-        WHERE ev.code = ? AND ev.expires_at > NOW()
+        WHERE ev.code = ? 
         ORDER BY ev.created_at DESC 
         LIMIT 1
     ");
     $stmt->execute([$code]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Debug logging
+    if ($result) {
+        error_log("Found record for code: " . $code);
+        error_log("Expires at: " . $result['expires_at']);
+        error_log("Current time: " . date('Y-m-d H:i:s'));
+        
+        // Check if expired
+        $expiresAt = strtotime($result['expires_at']);
+        $now = time();
+        
+        if ($expiresAt > $now) {
+            error_log("Code is valid (not expired)");
+            return $result;
+        } else {
+            error_log("Code has expired");
+            return false;
+        }
+    } else {
+        error_log("No record found for code: " . $code);
+        return false;
+    }
 }
 
 function verifyEmailToken($pdo, $token) {
@@ -49,7 +74,7 @@ function verifyEmailToken($pdo, $token) {
 
 function completeVerification($pdo, $userId) {
     // Mark user as verified
-    $stmt = $pdo->prepare("UPDATE users SET is_verified = TRUE, verified_at = NOW() WHERE id = ?");
+    $stmt = $pdo->prepare("UPDATE users SET is_verified = 1, verified_at = NOW() WHERE id = ?");
     $stmt->execute([$userId]);
     
     // Delete verification tokens

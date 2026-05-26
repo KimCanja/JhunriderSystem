@@ -15,29 +15,29 @@ if (!isAdmin()) {
 try {
     $stmt = $pdo->prepare("
         SELECT 
-            dr.*,
             r.rental_id,
             r.pickup_date,
             r.return_date,
+            r.status,
+            r.total_price,
+            r.created_at,
             u.name as customer_name,
             u.email as customer_email,
             v.model as vehicle_model,
             v.plate_number
-        FROM damage_reports dr
-        JOIN rentals r ON dr.rental_id = r.rental_id
+        FROM rentals r
         JOIN users u ON r.user_id = u.id
         JOIN vehicles v ON r.vehicle_id = v.vehicle_id
-        ORDER BY dr.report_date DESC
+        ORDER BY r.created_at DESC
+        LIMIT 10
     ");
     $stmt->execute();
-    $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $rentals = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Format dates
-    foreach ($reports as &$report) {
-        $report['report_date'] = date('M d, Y', strtotime($report['report_date']));
-    }
-    
-    echo json_encode(['success' => true, 'reports' => $reports]);
+    echo json_encode([
+        'success' => true,
+        'rentals' => $rentals
+    ]);
     
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

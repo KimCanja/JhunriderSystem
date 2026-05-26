@@ -169,6 +169,12 @@ $available_schedules = $stmt->fetchAll();
     font-size: 16px;
     font-weight: 600;
 }
+.vehicle-image {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 10px;
+}
 </style>
 
 <div class="container-fluid mt-4">
@@ -194,19 +200,26 @@ $available_schedules = $stmt->fetchAll();
                                 <i class="fas fa-id-card"></i> <?php echo htmlspecialchars($vehicle['plate_number']); ?>
                             </p>
                             <p class="text-muted mb-2">
-                                <i class="fas fa-calendar"></i> <?php echo $vehicle['year']; ?>
+                                <i class="fas fa-calendar"></i> Year: <?php echo $vehicle['year']; ?>
                             </p>
                             <p class="text-muted mb-2">
-                                <i class="fas fa-tag"></i> <?php echo htmlspecialchars($vehicle['type']); ?>
+                                <i class="fas fa-tag"></i> Type: <?php echo htmlspecialchars($vehicle['type']); ?>
+                            </p>
+                            <p class="text-muted mb-2">
+                                <i class="fas fa-users"></i> Capacity: <?php echo $vehicle['passenger_capacity']; ?> passengers
                             </p>
                             <p class="mb-0">
                                 <strong>Price per Day:</strong> <span class="text-success">₱<?php echo number_format($vehicle['price_per_day'], 2); ?></span>
                             </p>
                         </div>
                         <div class="col-md-4 text-center">
-                            <div style="background: linear-gradient(135deg, #0A2540 0%, #1E2937 100%); height: 120px; display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; border-radius: 12px;">
-                                <i class="fas fa-car"></i>
-                            </div>
+                            <?php if ($vehicle['photo_url']): ?>
+                                <img src="<?php echo BASE_URL . $vehicle['photo_url']; ?>" class="vehicle-image" alt="<?php echo htmlspecialchars($vehicle['model']); ?>">
+                            <?php else: ?>
+                                <div style="background: linear-gradient(135deg, #0A2540 0%, #1E2937 100%); height: 120px; display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; border-radius: 12px;">
+                                    <i class="fas fa-car"></i>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -274,6 +287,8 @@ $available_schedules = $stmt->fetchAll();
                                                                 case 'All Day':
                                                                     $time_display = '📅 Full Day (24 hours)';
                                                                     break;
+                                                                default:
+                                                                    $time_display = $schedule['time_slot'];
                                                             }
                                                             echo $time_display;
                                                             ?>
@@ -297,10 +312,10 @@ $available_schedules = $stmt->fetchAll();
                             </div>
 
                             <div id="bookingDetails" style="display: <?php echo $schedule_id ? 'block' : 'none'; ?>;">
-                                <hr>
+                                <hr class="mt-4">
                                 <h5><i class="fas fa-info-circle"></i> Complete Your Booking</h5>
                                 
-                                <div class="row">
+                                <div class="row mt-3">
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">Pickup Date</label>
                                         <input type="text" id="display_pickup_date" class="form-control" readonly>
@@ -319,18 +334,27 @@ $available_schedules = $stmt->fetchAll();
                                     <textarea name="notes" class="form-control" rows="3" placeholder="Any special requests or notes..."></textarea>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label">Total Price</label>
-                                    <h4 class="text-success">₱<?php echo number_format($vehicle['price_per_day'], 2); ?></h4>
+                                <div class="mb-3 p-3 bg-light rounded">
+                                    <label class="form-label">Payment Summary</label>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Price per day:</span>
+                                        <span class="fw-bold">₱<?php echo number_format($vehicle['price_per_day'], 2); ?></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-2">
+                                        <span>Total Price:</span>
+                                        <h4 class="text-success mb-0">₱<?php echo number_format($vehicle['price_per_day'], 2); ?></h4>
+                                    </div>
                                     <small class="text-muted">Price is per day based on selected time slot</small>
                                 </div>
 
-                                <button type="submit" class="btn btn-primary btn-lg">
-                                    <i class="fas fa-check-circle"></i> Confirm Booking
-                                </button>
-                                <a href="browse-vehicles.php" class="btn btn-secondary btn-lg">
-                                    <i class="fas fa-arrow-left"></i> Back
-                                </a>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-check-circle"></i> Confirm Booking
+                                    </button>
+                                    <a href="browse-vehicles.php" class="btn btn-secondary btn-lg">
+                                        <i class="fas fa-arrow-left"></i> Back
+                                    </a>
+                                </div>
                             </div>
                         </form>
                     <?php endif; ?>
@@ -356,19 +380,40 @@ $available_schedules = $stmt->fetchAll();
             </div>
 
             <!-- Time Slot Information -->
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-header bg-warning">
                     <h5 class="mb-0"><i class="fas fa-clock"></i> Time Slot Guide</h5>
                 </div>
                 <div class="card-body">
-                    <p><strong>🌅 Morning (8AM - 12PM)</strong><br>Pickup: 8AM, Return next day 8AM</p>
-                    <p><strong>☀️ Afternoon (12PM - 4PM)</strong><br>Pickup: 12PM, Return next day 12PM</p>
-                    <p><strong>🌙 Evening (4PM - 8PM)</strong><br>Pickup: 4PM, Return next day 4PM</p>
-                    <p><strong>📅 Full Day (24 hours)</strong><br>Any time, return same time next day</p>
-                    <hr>
-                    <p class="text-muted mb-0 small">
-                        <i class="fas fa-shield-alt"></i> All bookings require admin approval
-                    </p>
+                    <div class="mb-3">
+                        <strong>🌅 Morning (8AM - 12PM)</strong>
+                        <p class="text-muted small mb-0">Pickup: 8AM, Return next day 8AM</p>
+                    </div>
+                    <div class="mb-3">
+                        <strong>☀️ Afternoon (12PM - 4PM)</strong>
+                        <p class="text-muted small mb-0">Pickup: 12PM, Return next day 12PM</p>
+                    </div>
+                    <div class="mb-3">
+                        <strong>🌙 Evening (4PM - 8PM)</strong>
+                        <p class="text-muted small mb-0">Pickup: 4PM, Return next day 4PM</p>
+                    </div>
+                    <div>
+                        <strong>📅 Full Day (24 hours)</strong>
+                        <p class="text-muted small mb-0">Any time, return same time next day</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Need Help Card -->
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-headset"></i> Need Help?</h5>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-phone-alt" style="font-size: 32px; color: #dc3545;"></i>
+                    <p class="mt-2 mb-0">Contact our support team:</p>
+                    <p class="fw-bold">(123) 456-7890</p>
+                    <small class="text-muted">support@tcrci.com</small>
                 </div>
             </div>
         </div>
@@ -392,13 +437,13 @@ function selectSchedule(scheduleId, date, timeSlot) {
     let displayTime = '';
     switch(timeSlot) {
         case '08:00-12:00':
-            displayTime = '8:00 AM - 12:00 PM';
+            displayTime = '8:00 AM - 12:00 PM (Morning)';
             break;
         case '12:00-16:00':
-            displayTime = '12:00 PM - 4:00 PM';
+            displayTime = '12:00 PM - 4:00 PM (Afternoon)';
             break;
         case '16:00-20:00':
-            displayTime = '4:00 PM - 8:00 PM';
+            displayTime = '4:00 PM - 8:00 PM (Evening)';
             break;
         case 'All Day':
             displayTime = 'Full Day (24 hours)';
@@ -416,14 +461,28 @@ function selectSchedule(scheduleId, date, timeSlot) {
     });
     
     // Add selected class to clicked card
-    event.currentTarget.classList.add('selected');
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('selected');
+    }
     
     // Show booking details form
-    document.getElementById('bookingDetails').style.display = 'block';
-    
-    // Scroll to booking details
-    document.getElementById('bookingDetails').scrollIntoView({ behavior: 'smooth' });
+    const bookingDetails = document.getElementById('bookingDetails');
+    if (bookingDetails) {
+        bookingDetails.style.display = 'block';
+        // Scroll to booking details
+        bookingDetails.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
+
+// Initialize if schedule is already selected on page load
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if ($schedule_id && $selected_schedule): ?>
+        // Trigger select for pre-selected schedule
+        const pickupDate = '<?php echo $selected_schedule['available_date']; ?>';
+        const timeSlot = '<?php echo $selected_schedule['time_slot']; ?>';
+        selectSchedule(<?php echo $schedule_id; ?>, pickupDate, timeSlot);
+    <?php endif; ?>
+});
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

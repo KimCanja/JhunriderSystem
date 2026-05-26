@@ -290,7 +290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: var(--charcoal-deep);
             transition: all 0.3s ease;
             width: 100%;
-            color: white;
+            color: var(--white) !important;  /* CHANGED: Force white text */
         }
 
         /* Padding for email with icon */
@@ -310,6 +310,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: var(--charcoal);
             box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
             outline: none;
+            color: var(--white) !important;  /* CHANGED: Keep white on focus */
+        }
+
+        /* Ensure input text stays white when autofilled by browser */
+        .form-control:-webkit-autofill,
+        .form-control:-webkit-autofill:focus {
+            -webkit-text-fill-color: white !important;
+            -webkit-box-shadow: 0 0 0px 1000px var(--charcoal-deep) inset !important;
+            transition: background-color 5000s ease-in-out 0s;
         }
 
         .form-control::placeholder {

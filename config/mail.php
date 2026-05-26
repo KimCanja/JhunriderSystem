@@ -3,7 +3,6 @@ require_once __DIR__ . '/../PHPMailer/src/Exception.php';
 require_once __DIR__ . '/../PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/../PHPMailer/src/SMTP.php';
 
-
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
@@ -15,10 +14,10 @@ function sendVerificationEmail($toEmail, $toName, $code, $token) {
         // Server settings - UPDATE WITH YOUR EMAIL SETTINGS
         $mail->SMTPDebug = SMTP::DEBUG_OFF;  // Set to DEBUG_SERVER for testing
         $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';        // Your SMTP server
+        $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'jhunridertagumrentcar@gmail.com';  // Your email
-        $mail->Password   = 'qrvw djzt ndsu byxs';     // Your app password
+        $mail->Username   = 'jhunridertagumrentcar@gmail.com';
+        $mail->Password   = 'qrvw djzt ndsu byxs';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
         
@@ -45,6 +44,7 @@ function sendVerificationEmail($toEmail, $toName, $code, $token) {
                 .code { font-size: 32px; font-weight: bold; color: #16A34A; letter-spacing: 5px; }
                 .button { display: inline-block; background: #16A34A; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
                 .footer { text-align: center; font-size: 12px; color: #666; margin-top: 30px; }
+                .warning { background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 5px; margin: 15px 0; text-align: center; }
             </style>
         </head>
         <body>
@@ -66,7 +66,10 @@ function sendVerificationEmail($toEmail, $toName, $code, $token) {
                     <a href='" . $verificationLink . "' class='button'>Verify Email</a>
                 </div>
                 
-                <p>This code will expire in <strong>24 hours</strong>.</p>
+                <div class='warning'>
+                    <strong>⚠️ IMPORTANT:</strong> This code will expire in <strong style='color: #dc3545;'>15 minutes</strong>.
+                </div>
+                
                 <div class='footer'>
                     <p>If you didn't create an account, please ignore this email.</p>
                     <p>&copy; 2025 Tagum City Rent Car Jhunrider. All rights reserved.</p>
@@ -76,7 +79,7 @@ function sendVerificationEmail($toEmail, $toName, $code, $token) {
         </html>
         ";
         
-        $mail->AltBody = "Your verification code is: $code\n\nOr visit: $verificationLink\n\nThis code expires in 24 hours.";
+        $mail->AltBody = "Your verification code is: $code\n\nOr visit: $verificationLink\n\n⚠️ IMPORTANT: This code expires in 15 minutes!";
         
         $mail->send();
         return true;
@@ -85,8 +88,80 @@ function sendVerificationEmail($toEmail, $toName, $code, $token) {
         return false;
     }
 }
-
-// Alternative: Using PHP mail() function (simpler but less reliable)
+function sendPasswordResetEmail($toEmail, $toName, $code, $token) {
+    $mail = new PHPMailer(true);
+    
+    try {
+        // Server settings - Same as your verification email
+        $mail->SMTPDebug = SMTP::DEBUG_OFF;
+        $mail->isSMTP();
+        $mail->Host       = 'smtp.gmail.com';
+        $mail->SMTPAuth   = true;
+        $mail->Username   = 'jhunridertagumrentcar@gmail.com';
+        $mail->Password   = 'qrvw djzt ndsu byxs';
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = 587;
+        
+        // Recipients
+        $mail->setFrom('no-reply@yourdomain.com', 'Tagum City Rent Car');
+        $mail->addAddress($toEmail, $toName);
+        
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = 'Password Reset Request - Tagum City Rent Car';
+        
+        $resetLink = "http://" . $_SERVER['HTTP_HOST'] . "/JhunriderSystem/auth/forgot-password.php?token=" . urlencode($token);
+        
+        $mail->Body = "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+                .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .header { text-align: center; border-bottom: 3px solid #16A34A; padding-bottom: 20px; }
+                .code-box { background: #f0fdf4; border: 2px solid #16A34A; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+                .code { font-size: 32px; font-weight: bold; color: #16A34A; letter-spacing: 5px; }
+                .warning { background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 5px; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h2>Tagum City Rent Car Jhunrider</h2>
+                    <p>Password Reset Request</p>
+                </div>
+                <p>Hello <strong>" . htmlspecialchars($toName) . "</strong>,</p>
+                <p>We received a request to reset your password. Use the verification code below to reset your password.</p>
+                
+                <div class='code-box'>
+                    <p>Your password reset code is:</p>
+                    <div class='code'>" . $code . "</div>
+                </div>
+                
+                <div class='warning'>
+                    <strong>⚠️ IMPORTANT:</strong> This code will expire in <strong style='color: #dc3545;'>15 minutes</strong>.
+                </div>
+                
+                <p>If you didn't request a password reset, please ignore this email.</p>
+                <div class='footer'>
+                    <p>&copy; 2025 Tagum City Rent Car Jhunrider. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        ";
+        
+        $mail->AltBody = "Your password reset code is: $code\n\nThis code expires in 15 minutes.\n\nIf you didn't request this, please ignore this email.";
+        
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log("Password reset email failed: " . $mail->ErrorInfo);
+        return false;
+    }
+}
+// Alternative: Using PHP mail() function
 function sendVerificationEmailSimple($toEmail, $toName, $code, $token) {
     $subject = "Verify Your Email - Tagum City Rent Car";
     $verificationLink = "http://" . $_SERVER['HTTP_HOST'] . "/verify-email.php?token=" . urlencode($token);
@@ -100,7 +175,7 @@ function sendVerificationEmailSimple($toEmail, $toName, $code, $token) {
     
     Or click this link to verify: $verificationLink
     
-    This code expires in 24 hours.
+    ⚠️ IMPORTANT: This code expires in 15 minutes!
     
     Regards,
     Tagum City Rent Car Jhunrider

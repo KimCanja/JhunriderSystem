@@ -13,31 +13,35 @@ if (!isAdmin()) {
 }
 
 try {
+    // Get rentals that are active/completed and have vehicles
     $stmt = $pdo->prepare("
         SELECT 
-            dr.*,
             r.rental_id,
             r.pickup_date,
             r.return_date,
+            r.status,
             u.name as customer_name,
-            u.email as customer_email,
             v.model as vehicle_model,
             v.plate_number
-        FROM damage_reports dr
-        JOIN rentals r ON dr.rental_id = r.rental_id
+        FROM rentals r
         JOIN users u ON r.user_id = u.id
         JOIN vehicles v ON r.vehicle_id = v.vehicle_id
-        ORDER BY dr.report_date DESC
+        WHERE r.status IN ('active', 'completed', 'approved')
+        ORDER BY r.rental_id DESC
+        LIMIT 50
     ");
     $stmt->execute();
-    $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $rentals = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Format dates
-    foreach ($reports as &$report) {
-        $report['report_date'] = date('M d, Y', strtotime($report['report_date']));
+    $rental_list = [];
+    foreach ($rentals as $rental) {
+        $rental_list[] = [
+            'rental_id' => $rental['rental_id'],
+            'label' => "#{$rental['rental_id']} - {$rental['customer_name']} - {$rental['vehicle_model']} ({$rental['plate_number']}) - Status: {$rental['status']}"
+        ];
     }
     
-    echo json_encode(['success' => true, 'reports' => $reports]);
+    echo json_encode(['success' => true, 'rentals' => $rental_list]);
     
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

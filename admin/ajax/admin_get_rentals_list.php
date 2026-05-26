@@ -1,60 +1,65 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once '../../config/database.php';
-session_start();
+require_once '../../config/constants.php';
+
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+if (!isAdmin()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
 
-$status = $_GET['status'] ?? '';
-$allowed = ['pending', 'approved', 'active', 'completed', 'cancelled', ''];
-if (!in_array($status, $allowed)) {
-    $status = '';
+$status = isset($_GET['status']) && !empty($_GET['status']) ? $_GET['status'] : null;
+
+try {
+    // Build query - make sure column names match your database
+    $sql = "
+        SELECT 
+            r.rental_id,
+            r.user_id,
+            r.vehicle_id,
+            r.pickup_date,
+            r.pickup_time,
+            r.return_date,
+            r.total_price,
+            r.status,
+            r.created_at,
+            u.name as customer_name,
+            u.email as customer_email,
+            v.model as vehicle_model,
+            v.plate_number
+        FROM rentals r
+        JOIN users u ON r.user_id = u.id
+        JOIN vehicles v ON r.vehicle_id = v.vehicle_id
+    ";
+    
+    if ($status) {
+        $sql .= " WHERE r.status = :status";
+    }
+    
+    $sql .= " ORDER BY r.created_at DESC";
+    
+    $stmt = $pdo->prepare($sql);
+    
+    if ($status) {
+        $stmt->bindParam(':status', $status);
+    }
+    
+    $stmt->execute();
+    $rentals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Format dates
+    foreach ($rentals as &$rental) {
+        $rental['pickup_date'] = date('M d, Y', strtotime($rental['pickup_date']));
+        $rental['return_date'] = date('M d, Y', strtotime($rental['return_date']));
+        $rental['total_price'] = (float)$rental['total_price'];
+    }
+    
+    echo json_encode(['success' => true, 'rentals' => $rentals]);
+} catch (PDOException $e) {
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
-
-$query = "
-    SELECT 
-        r.*, 
-        v.model, 
-        v.plate_number, 
-        v.type,
-        v.price_per_day,
-        u.name, 
-        u.email
-    FROM rentals r
-    INNER JOIN vehicles v ON r.vehicle_id = v.vehicle_id
-    INNER JOIN users u ON r.user_id = u.id
-";
-
-$params = [];
-if (!empty($status)) {
-    $query .= " WHERE r.status = ?";
-    $params[] = $status;
-}
-
-$query .= " ORDER BY r.created_at DESC";
-
-$stmt = $pdo->prepare($query);
-$stmt->execute($params);
-$rentals = $stmt->fetchAll();
-
-$formatted = [];
-foreach ($rentals as $rental) {
-    $formatted[] = [
-        'id' => $rental['rental_id'],
-        'customer_name' => $rental['name'],
-        'customer_email' => $rental['email'],
-        'vehicle_model' => $rental['model'],
-        'plate_number' => $rental['plate_number'],
-        'pickup_date' => date('M d, Y', strtotime($rental['pickup_date'])),
-        'pickup_time' => $rental['pickup_time'] ? date('h:i A', strtotime($rental['pickup_time'])) : '',
-        'return_date' => date('M d, Y', strtotime($rental['return_date'])),
-        'status' => $rental['status'],
-        'total_price' => $rental['total_price']
-    ];
-}
-
-echo json_encode(['success' => true, 'rentals' => $formatted]);
 ?>

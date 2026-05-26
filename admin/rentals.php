@@ -2,6 +2,7 @@
 $page_title = 'Manage Rentals';
 require_once '../includes/header.php';
 require_once '../config/database.php';
+require_once '../config/constants.php';
 require_once '../includes/sos-button.php';
 
 if (!isAdmin()) {
@@ -18,6 +19,8 @@ if (!isAdmin()) {
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
@@ -26,16 +29,12 @@ if (!isAdmin()) {
 <div class="main-content">
     <div class="container-fluid">
         <div class="row mb-4">
-            <div class="col-md-12">
+            <div class="col-md-8">
                 <h1><i class="fas fa-calendar-check"></i> Manage Rentals</h1>
                 <p class="text-muted">Review and approve rental bookings</p>
             </div>
-        </div>
-
-        <!-- Auto-refresh Controls -->
-        <div class="row mb-3">
-            <div class="col-md-12 text-end">
-                <button class="btn btn-sm btn-success" id="manualRefreshBtn">
+            <div class="col-md-4 text-end">
+                <button class="btn btn-sm btn-success me-2" id="manualRefreshBtn">
                     <i class="fas fa-sync-alt"></i> Refresh Now
                 </button>
                 <button class="btn btn-sm btn-secondary" id="toggleAutoRefreshBtn">
@@ -112,7 +111,7 @@ $(document).ready(function() {
         }
     });
     
-    // Handle status filter click (event delegation)
+    // Handle status filter click
     $(document).on('click', '.filter-btn', function(e) {
         e.preventDefault();
         currentStatus = $(this).data('status');
@@ -125,7 +124,7 @@ $(document).ready(function() {
         loadRentals();
     });
     
-    // Handle action buttons (approve, reject, start, complete)
+    // Handle action buttons
     $(document).on('click', '.action-btn', function(e) {
         e.preventDefault();
         const rentalId = $(this).data('id');
@@ -242,7 +241,6 @@ $(document).ready(function() {
                 Swal.close();
                 if (response.success) {
                     showToast(response.message, 'success');
-                    // Reload both filters and rentals
                     loadFilters();
                     loadRentals();
                 } else {
@@ -266,16 +264,14 @@ $(document).ready(function() {
                             <div class="d-flex flex-wrap gap-2">
         `;
         
-        // All button
         const allActive = currentStatus === '';
         html += `
             <button class="btn ${allActive ? 'btn-primary' : 'btn-outline-primary'} filter-btn" data-status="">
                 <i class="fas fa-list"></i> All 
-                <span class="badge ${allActive ? 'bg-light text-dark' : 'bg-secondary text-white'} ms-1">${filters.total}</span>
+                <span class="badge ${allActive ? 'bg-light text-dark' : 'bg-secondary text-white'} ms-1">${filters.total || 0}</span>
             </button>
         `;
         
-        // Status buttons
         const statuses = ['pending', 'approved', 'active', 'completed', 'cancelled'];
         statuses.forEach(status => {
             const isActive = currentStatus === status;
@@ -293,7 +289,7 @@ $(document).ready(function() {
             html += `
                 <button class="btn ${isActive ? `btn-${btnClass}` : `btn-outline-${btnClass}`} filter-btn" data-status="${status}">
                     <i class="fas ${icon}"></i> ${status.charAt(0).toUpperCase() + status.slice(1)} 
-                    <span class="badge ${isActive ? 'bg-light text-dark' : 'bg-secondary text-white'} ms-1">${filters[status]}</span>
+                    <span class="badge ${isActive ? 'bg-light text-dark' : 'bg-secondary text-white'} ms-1">${filters[status] || 0}</span>
                 </button>
             `;
         });
@@ -311,7 +307,7 @@ $(document).ready(function() {
     
     // Display rentals table
     function displayRentals(rentals) {
-        if (rentals.length === 0) {
+        if (!rentals || rentals.length === 0) {
             $('#rentalsContainer').html(`
                 <div class="row">
                     <div class="col-md-12">
@@ -335,7 +331,7 @@ $(document).ready(function() {
                         <div class="card-header bg-white">
                             <h5 class="mb-0">
                                 <i class="fas fa-clipboard-list"></i> 
-                                Rental Bookings
+                                Rental Bookings (${rentals.length})
                                 ${currentStatus ? `<span class="badge bg-primary ms-2">Filtered: ${currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}</span>` : ''}
                             </h5>
                         </div>
@@ -344,6 +340,7 @@ $(document).ready(function() {
                                 <table class="table table-hover">
                                     <thead class="table-light">
                                         <tr>
+                                            <th>ID</th>
                                             <th>Customer</th>
                                             <th>Vehicle</th>
                                             <th>Pickup Date</th>
@@ -357,6 +354,8 @@ $(document).ready(function() {
         `;
         
         rentals.forEach(rental => {
+            const rentalId = rental.rental_id || rental.id;
+            
             let badgeClass = '';
             let badgeIcon = '';
             
@@ -370,50 +369,51 @@ $(document).ready(function() {
             }
             
             html += `
-                <tr data-rental-id="${rental.id}">
+                <tr data-rental-id="${rentalId}">
+                    <td><strong>#${rentalId}</strong></strong>
                     <td>
                         <div>
-                            <strong>${escapeHtml(rental.customer_name)}</strong>
+                            <strong>${escapeHtml(rental.customer_name || 'N/A')}</strong>
                             <br>
-                            <small class="text-muted">${escapeHtml(rental.customer_email)}</small>
+                            <small class="text-muted">${escapeHtml(rental.customer_email || 'N/A')}</small>
                         </div>
-                    </td>
+                    </strong>
                     <td>
-                        ${escapeHtml(rental.vehicle_model)}
+                        ${escapeHtml(rental.vehicle_model || 'N/A')}
                         <br>
-                        <small class="text-muted">${escapeHtml(rental.plate_number)}</small>
-                    </td>
+                        <small class="text-muted">${escapeHtml(rental.plate_number || 'N/A')}</small>
+                    </strong>
                     <td>
                         <i class="fas fa-calendar-alt text-primary"></i> 
-                        ${rental.pickup_date}
+                        ${rental.pickup_date || 'N/A'}
                         ${rental.pickup_time ? `<br><small class="text-muted"><i class="fas fa-clock"></i> ${rental.pickup_time}</small>` : ''}
-                    </td>
+                    </strong>
                     <td>
                         <i class="fas fa-calendar-check text-success"></i> 
-                        ${rental.return_date}
-                    </td>
+                        ${rental.return_date || 'N/A'}
+                    </strong>
                     <td>
                         <span class="badge bg-${badgeClass}">
                             <i class="fas ${badgeIcon}"></i>
-                            ${rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}
+                            ${rental.status ? rental.status.charAt(0).toUpperCase() + rental.status.slice(1) : 'N/A'}
                         </span>
-                    </td>
+                    </strong>
                     <td>
-                        <strong class="text-success">$${Number(rental.total_price).toLocaleString()}</strong>
-                    </td>
+                        <strong class="text-success">₱${Number(rental.total_price || 0).toLocaleString()}</strong>
+                    </strong>
                     <td>
-                        <div class="btn-group" role="group">
-                            <a href="rental-details.php?id=${rental.id}" class="btn btn-sm btn-info">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="rental-details.php?id=${rentalId}" class="btn btn-info">
                                 <i class="fas fa-eye"></i>
                             </a>
             `;
             
             if (rental.status === 'pending') {
                 html += `
-                    <button class="btn btn-sm btn-success action-btn" data-id="${rental.id}" data-action="approve">
+                    <button class="btn btn-success action-btn" data-id="${rentalId}" data-action="approve">
                         <i class="fas fa-check"></i>
                     </button>
-                    <button class="btn btn-sm btn-danger action-btn" data-id="${rental.id}" data-action="reject">
+                    <button class="btn btn-danger action-btn" data-id="${rentalId}" data-action="reject">
                         <i class="fas fa-times"></i>
                     </button>
                 `;
@@ -421,7 +421,7 @@ $(document).ready(function() {
             
             if (rental.status === 'approved') {
                 html += `
-                    <button class="btn btn-sm btn-primary action-btn" data-id="${rental.id}" data-action="start">
+                    <button class="btn btn-primary action-btn" data-id="${rentalId}" data-action="start">
                         <i class="fas fa-play"></i>
                     </button>
                 `;
@@ -429,7 +429,7 @@ $(document).ready(function() {
             
             if (rental.status === 'active') {
                 html += `
-                    <button class="btn btn-sm btn-success action-btn" data-id="${rental.id}" data-action="complete">
+                    <button class="btn btn-success action-btn" data-id="${rentalId}" data-action="complete">
                         <i class="fas fa-flag-checkered"></i>
                     </button>
                 `;
@@ -437,7 +437,7 @@ $(document).ready(function() {
             
             html += `
                         </div>
-                    </td>
+                    </strong>
                 </tr>
             `;
         });

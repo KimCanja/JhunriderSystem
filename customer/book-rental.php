@@ -3,12 +3,12 @@ $page_title = 'Book Rental';
 require_once '../includes/header.php';
 require_once '../config/database.php';
 
-
 if (!isCustomer()) {
     redirect(BASE_URL . 'auth/login.php');
 }
 
 $vehicle_id = $_GET['vehicle_id'] ?? null;
+$schedule_id = $_GET['schedule_id'] ?? null;
 $error = '';
 $success = '';
 
@@ -25,128 +25,405 @@ if (!$vehicle) {
     redirect(BASE_URL . 'customer/browse-vehicles.php');
 }
 
+// If schedule_id is provided, get that specific schedule
+if ($schedule_id) {
+    $stmt = $pdo->prepare("
+        SELECT s.*, v.model, v.plate_number, v.price_per_day, v.year, v.type
+        FROM schedules s
+        JOIN vehicles v ON s.vehicle_id = v.vehicle_id
+        WHERE s.schedule_id = ? AND s.is_booked = 0 AND s.available_date >= CURDATE()
+    ");
+    $stmt->execute([$schedule_id]);
+    $selected_schedule = $stmt->fetch();
+    
+    if (!$selected_schedule) {
+        $error = 'This schedule is no longer available.';
+    }
+}
+
 // Handle booking
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $schedule_id = $_POST['schedule_id'] ?? null;
     $pickup_date = $_POST['pickup_date'] ?? '';
-    $return_date = $_POST['return_date'] ?? '';
     $pickup_time = $_POST['pickup_time'] ?? '';
     $notes = $_POST['notes'] ?? '';
 
-    if (empty($pickup_date) || empty($return_date) || empty($pickup_time)) {
+    if (!$schedule_id) {
+        $error = 'Please select a valid schedule.';
+    } elseif (empty($pickup_date) || empty($pickup_time)) {
         $error = 'All fields are required.';
     } else {
-        $pickup = new DateTime($pickup_date);
-        $return = new DateTime($return_date);
-        
-        if ($return <= $pickup) {
-            $error = 'Return date must be after pickup date.';
-        } else {
-            $days = $return->diff($pickup)->days;
-            $total_price = $vehicle['price_per_day'] * $days;
-
-            try {
-                $stmt = $pdo->prepare("
-                    INSERT INTO rentals (user_id, vehicle_id, pickup_date, return_date, pickup_time, status, notes, total_price)
-                    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
-                ");
-                $stmt->execute([$_SESSION['user_id'], $vehicle_id, $pickup_date, $return_date, $pickup_time, $notes, $total_price]);
-                
-                $success = 'Booking created successfully! Awaiting admin approval.';
-                header("refresh:2;url=my-rentals.php");
-            } catch (PDOException $e) {
-                $error = 'Booking failed. Please try again.';
+        try {
+            $pdo->beginTransaction();
+            
+            // Lock and verify schedule is still available
+            $stmt = $pdo->prepare("
+                SELECT s.*, v.price_per_day 
+                FROM schedules s
+                JOIN vehicles v ON s.vehicle_id = v.vehicle_id
+                WHERE s.schedule_id = ? AND s.is_booked = 0 AND s.available_date >= CURDATE()
+                FOR UPDATE
+            ");
+            $stmt->execute([$schedule_id]);
+            $schedule = $stmt->fetch();
+            
+            if (!$schedule) {
+                throw new Exception('This time slot is no longer available. Please choose another slot.');
             }
+            
+            // Calculate return date based on time slot
+            $return_date = $schedule['available_date'];
+            if ($schedule['time_slot'] == 'All Day') {
+                $return_date = $schedule['available_date'];
+            } else {
+                $return_date = date('Y-m-d', strtotime($schedule['available_date'] . ' +1 day'));
+            }
+            
+            $total_price = $vehicle['price_per_day'];
+            
+            // Create rental record with schedule_id
+            $stmt = $pdo->prepare("
+                INSERT INTO rentals (
+                    user_id, vehicle_id, schedule_id, pickup_date, pickup_time, 
+                    return_date, status, notes, total_price
+                ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+            ");
+            $stmt->execute([
+                $_SESSION['user_id'], 
+                $vehicle_id, 
+                $schedule_id,
+                $pickup_date, 
+                $pickup_time, 
+                $return_date, 
+                $notes, 
+                $total_price
+            ]);
+            
+            // Mark schedule as booked
+            $stmt = $pdo->prepare("UPDATE schedules SET is_booked = 1 WHERE schedule_id = ?");
+            $stmt->execute([$schedule_id]);
+            
+            $pdo->commit();
+            
+            $success = 'Booking created successfully! Awaiting admin approval.';
+            header("refresh:2;url=my-rentals.php");
+            
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $error = $e->getMessage();
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            $error = 'Booking failed. Please try again.';
         }
     }
 }
+
+// Get available schedules for this vehicle
+$stmt = $pdo->prepare("
+    SELECT s.*, v.model, v.plate_number, v.price_per_day, v.year, v.type
+    FROM schedules s
+    JOIN vehicles v ON s.vehicle_id = v.vehicle_id
+    WHERE s.vehicle_id = ? 
+    AND s.is_booked = 0 
+    AND s.available_date >= CURDATE()
+    ORDER BY s.available_date ASC, 
+    FIELD(s.time_slot, '08:00-12:00', '12:00-16:00', '16:00-20:00', 'All Day')
+");
+$stmt->execute([$vehicle_id]);
+$available_schedules = $stmt->fetchAll();
 ?>
 
 <?php require_once '../includes/customer-navbar.php'; ?>
+
+<style>
+.schedule-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid #e0e0e0;
+    margin-bottom: 15px;
+}
+.schedule-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+.schedule-card.selected {
+    border-color: #28a745;
+    background: #f0fff4;
+    box-shadow: 0 5px 15px rgba(40,167,69,0.2);
+}
+.schedule-card .time-badge {
+    font-size: 18px;
+    font-weight: bold;
+}
+.schedule-card .date-badge {
+    background: #007bff;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    display: inline-block;
+}
+.slot-available {
+    color: #28a745;
+}
+.time-slot {
+    font-size: 16px;
+    font-weight: 600;
+}
+</style>
 
 <div class="container-fluid mt-4">
     <div class="row mb-4">
         <div class="col-md-12">
             <h1><i class="fas fa-calendar-check"></i> Book Rental</h1>
-            <p class="text-muted">Complete your vehicle booking</p>
+            <p class="text-muted">Select an available time slot for your rental</p>
         </div>
     </div>
 
     <div class="row">
         <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Booking Details</h5>
+            <!-- Vehicle Info Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-car"></i> Selected Vehicle</h5>
                 </div>
                 <div class="card-body">
-                    <?php if ($error): ?>
-                        <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?></div>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h4><?php echo htmlspecialchars($vehicle['model']); ?></h4>
+                            <p class="text-muted mb-2">
+                                <i class="fas fa-id-card"></i> <?php echo htmlspecialchars($vehicle['plate_number']); ?>
+                            </p>
+                            <p class="text-muted mb-2">
+                                <i class="fas fa-calendar"></i> <?php echo $vehicle['year']; ?>
+                            </p>
+                            <p class="text-muted mb-2">
+                                <i class="fas fa-tag"></i> <?php echo htmlspecialchars($vehicle['type']); ?>
+                            </p>
+                            <p class="mb-0">
+                                <strong>Price per Day:</strong> <span class="text-success">₱<?php echo number_format($vehicle['price_per_day'], 2); ?></span>
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div style="background: linear-gradient(135deg, #0A2540 0%, #1E2937 100%); height: 120px; display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; border-radius: 12px;">
+                                <i class="fas fa-car"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Schedules Section -->
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-clock"></i> Available Time Slots</h5>
+                </div>
+                <div class="card-body">
+                    <?php if ($error && !$success): ?>
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?>
+                        </div>
                     <?php endif; ?>
+                    
                     <?php if ($success): ?>
-                        <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success); ?></div>
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success); ?>
+                        </div>
                     <?php endif; ?>
 
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Pickup Date</label>
-                            <input type="date" name="pickup_date" class="form-control" required min="<?php echo date('Y-m-d'); ?>">
+                    <?php if (empty($available_schedules)): ?>
+                        <div class="alert alert-warning text-center py-5">
+                            <i class="fas fa-calendar-times" style="font-size: 48px;"></i>
+                            <h4 class="mt-3">No Available Schedules</h4>
+                            <p>This vehicle has no available time slots at the moment. Please check back later or choose another vehicle.</p>
+                            <a href="browse-vehicles.php" class="btn btn-primary mt-2">
+                                <i class="fas fa-arrow-left"></i> Browse Other Vehicles
+                            </a>
                         </div>
+                    <?php else: ?>
+                        <form method="POST" id="bookingForm">
+                            <input type="hidden" name="schedule_id" id="selectedScheduleId" value="<?php echo $schedule_id ?? ''; ?>">
+                            
+                            <div class="row">
+                                <?php foreach ($available_schedules as $schedule): ?>
+                                    <div class="col-md-12">
+                                        <div class="schedule-card card <?php echo ($schedule_id == $schedule['schedule_id']) ? 'selected' : ''; ?>" 
+                                             onclick="selectSchedule(<?php echo $schedule['schedule_id']; ?>, '<?php echo $schedule['available_date']; ?>', '<?php echo $schedule['time_slot']; ?>')">
+                                            <div class="card-body">
+                                                <div class="row align-items-center">
+                                                    <div class="col-md-3">
+                                                        <div class="date-badge">
+                                                            <i class="fas fa-calendar"></i> 
+                                                            <?php echo date('F d, Y', strtotime($schedule['available_date'])); ?>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="time-slot">
+                                                            <i class="fas fa-clock text-primary"></i> 
+                                                            <?php 
+                                                            $time_display = $schedule['time_slot'];
+                                                            switch($schedule['time_slot']) {
+                                                                case '08:00-12:00':
+                                                                    $time_display = '🌅 Morning (8:00 AM - 12:00 PM)';
+                                                                    break;
+                                                                case '12:00-16:00':
+                                                                    $time_display = '☀️ Afternoon (12:00 PM - 4:00 PM)';
+                                                                    break;
+                                                                case '16:00-20:00':
+                                                                    $time_display = '🌙 Evening (4:00 PM - 8:00 PM)';
+                                                                    break;
+                                                                case 'All Day':
+                                                                    $time_display = '📅 Full Day (24 hours)';
+                                                                    break;
+                                                            }
+                                                            echo $time_display;
+                                                            ?>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <span class="badge bg-success slot-available">
+                                                            <i class="fas fa-check-circle"></i> Available
+                                                        </span>
+                                                    </div>
+                                                    <div class="col-md-2 text-end">
+                                                        <span class="text-success fw-bold">
+                                                            ₱<?php echo number_format($vehicle['price_per_day'], 2); ?>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Pickup Time</label>
-                            <input type="time" name="pickup_time" class="form-control" required>
-                        </div>
+                            <div id="bookingDetails" style="display: <?php echo $schedule_id ? 'block' : 'none'; ?>;">
+                                <hr>
+                                <h5><i class="fas fa-info-circle"></i> Complete Your Booking</h5>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Pickup Date</label>
+                                        <input type="text" id="display_pickup_date" class="form-control" readonly>
+                                        <input type="hidden" name="pickup_date" id="pickup_date">
+                                    </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Pickup Time</label>
+                                        <input type="text" id="display_pickup_time" class="form-control" readonly>
+                                        <input type="hidden" name="pickup_time" id="pickup_time">
+                                    </div>
+                                </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Return Date</label>
-                            <input type="date" name="return_date" class="form-control" required min="<?php echo date('Y-m-d'); ?>">
-                        </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Special Notes (Optional)</label>
+                                    <textarea name="notes" class="form-control" rows="3" placeholder="Any special requests or notes..."></textarea>
+                                </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Special Notes (Optional)</label>
-                            <textarea name="notes" class="form-control" rows="4" placeholder="Any special requests or notes..."></textarea>
-                        </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Total Price</label>
+                                    <h4 class="text-success">₱<?php echo number_format($vehicle['price_per_day'], 2); ?></h4>
+                                    <small class="text-muted">Price is per day based on selected time slot</small>
+                                </div>
 
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-check"></i> Confirm Booking
-                        </button>
-                        <a href="browse-vehicles.php" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Back
-                        </a>
-                    </form>
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-check-circle"></i> Confirm Booking
+                                </button>
+                                <a href="browse-vehicles.php" class="btn btn-secondary btn-lg">
+                                    <i class="fas fa-arrow-left"></i> Back
+                                </a>
+                            </div>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
 
         <div class="col-md-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Vehicle Summary</h5>
+            <!-- Booking Instructions -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> How to Book</h5>
                 </div>
                 <div class="card-body">
-                    <div style="background: linear-gradient(135deg, #0A2540 0%, #1E2937 100%); height: 150px; display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; border-radius: 12px; margin-bottom: 20px;">
-                        <i class="fas fa-car"></i>
-                    </div>
-                    <h5><?php echo htmlspecialchars($vehicle['model']); ?></h5>
-                    <p class="text-muted mb-2">
-                        <i class="fas fa-id-card"></i> <?php echo htmlspecialchars($vehicle['plate_number']); ?>
-                    </p>
-                    <p class="text-muted mb-2">
-                        <i class="fas fa-calendar"></i> <?php echo $vehicle['year']; ?>
-                    </p>
-                    <p class="text-muted mb-3">
-                        <i class="fas fa-tag"></i> <?php echo htmlspecialchars($vehicle['type']); ?>
-                    </p>
+                    <ol class="mb-0">
+                        <li class="mb-2">Click on an available time slot above</li>
+                        <li class="mb-2">Review the booking details</li>
+                        <li class="mb-2">Add any special notes if needed</li>
+                        <li class="mb-2">Click "Confirm Booking" to complete</li>
+                        <li>Wait for admin approval</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Time Slot Information -->
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0"><i class="fas fa-clock"></i> Time Slot Guide</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>🌅 Morning (8AM - 12PM)</strong><br>Pickup: 8AM, Return next day 8AM</p>
+                    <p><strong>☀️ Afternoon (12PM - 4PM)</strong><br>Pickup: 12PM, Return next day 12PM</p>
+                    <p><strong>🌙 Evening (4PM - 8PM)</strong><br>Pickup: 4PM, Return next day 4PM</p>
+                    <p><strong>📅 Full Day (24 hours)</strong><br>Any time, return same time next day</p>
                     <hr>
-                    <p class="mb-2">
-                        <strong>Price per Day:</strong> <span class="text-success">$<?php echo number_format($vehicle['price_per_day'], 2); ?></span>
-                    </p>
-                    <p class="mb-0">
-                        <strong>Status:</strong> <span class="badge badge-approved">Available</span>
+                    <p class="text-muted mb-0 small">
+                        <i class="fas fa-shield-alt"></i> All bookings require admin approval
                     </p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function selectSchedule(scheduleId, date, timeSlot) {
+    // Update hidden fields
+    document.getElementById('selectedScheduleId').value = scheduleId;
+    document.getElementById('pickup_date').value = date;
+    document.getElementById('pickup_time').value = timeSlot;
+    
+    // Format display values
+    const formattedDate = new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    
+    let displayTime = '';
+    switch(timeSlot) {
+        case '08:00-12:00':
+            displayTime = '8:00 AM - 12:00 PM';
+            break;
+        case '12:00-16:00':
+            displayTime = '12:00 PM - 4:00 PM';
+            break;
+        case '16:00-20:00':
+            displayTime = '4:00 PM - 8:00 PM';
+            break;
+        case 'All Day':
+            displayTime = 'Full Day (24 hours)';
+            break;
+        default:
+            displayTime = timeSlot;
+    }
+    
+    document.getElementById('display_pickup_date').value = formattedDate;
+    document.getElementById('display_pickup_time').value = displayTime;
+    
+    // Remove selected class from all cards
+    document.querySelectorAll('.schedule-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Add selected class to clicked card
+    event.currentTarget.classList.add('selected');
+    
+    // Show booking details form
+    document.getElementById('bookingDetails').style.display = 'block';
+    
+    // Scroll to booking details
+    document.getElementById('bookingDetails').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
 
 <?php require_once '../includes/footer.php'; ?>

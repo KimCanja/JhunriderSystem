@@ -5,6 +5,8 @@ ini_set('display_errors', 1);
 require_once '../config/database.php';
 require_once '../config/constants.php';
 require_once '../config/encryption.php';
+require_once '../config/token.php';
+require_once '../config/mail.php';
 
 $error = '';
 $success = '';
@@ -14,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = trim($_POST['password'] ?? '');
     $confirm_password = trim($_POST['confirm_password'] ?? '');
-    $role = 'customer'; // Force role to customer only
+    $role = 'customer';
     $terms = isset($_POST['terms']) ? true : false;
 
     // Validation
@@ -38,34 +40,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'You must agree to the Terms & Conditions.';
     } else {
         // Check if email already exists
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt = $pdo->prepare("SELECT id, is_verified FROM users WHERE email = ?");
         $stmt->execute([$email]);
+        $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($stmt->rowCount() > 0) {
-            $error = 'Email already registered.';
-        } else {
+        if ($existingUser) {
+            if ($existingUser['is_verified']) {
+                $error = 'Email already registered.';
+            } else {
+                // User exists but not verified - allow re-registration
+                $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                $stmt->execute([$existingUser['id']]);
+            }
+        }
+        
+        if (empty($error)) {
             $plain_password = $password;
 
             try {
-                $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$name, $email, $plain_password, $role]);
+                $pdo->beginTransaction();
+                
+                // Insert user (not verified yet)
+               $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, is_verified) VALUES (?, ?, ?, ?, FALSE)");
+$stmt->execute([$name, $email, $plain_password, $role]);
                 
                 $user_id = $pdo->lastInsertId();
 
-                // Always create customer record since role is always 'customer'
+                // Create customer record
                 $stmt = $pdo->prepare("INSERT INTO customers (user_id) VALUES (?)");
                 $stmt->execute([$user_id]);
-
-                $success = 'Registration successful! Redirecting to login...';
-                header("refresh:2;url=login.php");
-                exit();
-            } catch (PDOException $e) {
-                $error = 'Registration failed. Please try again.';
+                
+                // Generate verification token and code
+                $token = generateToken();
+                $code = generateVerificationCode();
+                storeVerificationToken($pdo, $user_id, $token, $code);
+                
+                // Send verification email
+                $emailSent = sendVerificationEmail($email, $name, $code, $token);
+                
+                if ($emailSent) {
+                    $pdo->commit();
+                    
+                    // Store user ID in session for verification
+                    session_start();
+                    $_SESSION['pending_verification_user_id'] = $user_id;
+                    $_SESSION['pending_verification_email'] = $email;
+                    
+                    // Redirect to verification page
+                    header("Location: verify-email-pending.php?email=" . urlencode($email));
+                    exit();
+                } else {
+                    throw new Exception("Failed to send verification email");
+                }
+                
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error = 'Registration failed. Could not send verification email. Please try again.';
+                error_log("Registration error: " . $e->getMessage());
             }
         }
     }
-    
-    $_POST = array();
 }
 ?>
 <!DOCTYPE html>

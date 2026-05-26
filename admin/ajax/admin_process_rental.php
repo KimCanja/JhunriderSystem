@@ -1,64 +1,94 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once '../../config/database.php';
-session_start();
+require_once '../../config/constants.php';
+
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+if (!isAdmin()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
     exit();
 }
 
 $rental_id = $_POST['rental_id'] ?? null;
 $action = $_POST['action'] ?? null;
 
-if (!$rental_id || !in_array($action, ['approve', 'reject', 'start', 'complete'])) {
-    echo json_encode(['success' => false, 'message' => 'Invalid request']);
+if (!$rental_id || !$action) {
+    echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
     exit();
 }
 
 try {
-    if ($action === 'approve') {
-        $stmt = $pdo->prepare("UPDATE rentals SET status = 'approved' WHERE rental_id = ?");
-        $stmt->execute([$rental_id]);
-        $message = 'Rental approved successfully!';
-    } 
-    elseif ($action === 'reject') {
-        $stmt = $pdo->prepare("UPDATE rentals SET status = 'cancelled' WHERE rental_id = ?");
-        $stmt->execute([$rental_id]);
-        $message = 'Rental rejected successfully!';
+    $pdo->beginTransaction();
+    
+    // Get rental details
+    $stmt = $pdo->prepare("SELECT * FROM rentals WHERE rental_id = ?");
+    $stmt->execute([$rental_id]);
+    $rental = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$rental) {
+        throw new Exception('Rental not found');
     }
-    elseif ($action === 'start') {
-        $stmt = $pdo->prepare("UPDATE rentals SET status = 'active' WHERE rental_id = ?");
-        $stmt->execute([$rental_id]);
-        
-        // Update vehicle status
-        $stmt = $pdo->prepare("SELECT vehicle_id FROM rentals WHERE rental_id = ?");
-        $stmt->execute([$rental_id]);
-        $rental = $stmt->fetch();
-        if ($rental) {
-            $stmt = $pdo->prepare("UPDATE vehicles SET status = 'rented' WHERE vehicle_id = ?");
-            $stmt->execute([$rental['vehicle_id']]);
-        }
-        $message = 'Rental started successfully!';
+    
+    $new_status = '';
+    $message = '';
+    $update_vehicle = false;
+    $vehicle_status = '';
+    
+    switch ($action) {
+        case 'approve':
+            $new_status = 'approved';
+            $message = 'Rental booking approved successfully';
+            break;
+            
+        case 'reject':
+            $new_status = 'cancelled';
+            $message = 'Rental booking rejected';
+            break;
+            
+        case 'start':
+            $new_status = 'active';
+            $update_vehicle = true;
+            $vehicle_status = 'rented';
+            $message = 'Rental started successfully';
+            break;
+            
+        case 'complete':
+            $new_status = 'completed';
+            $update_vehicle = true;
+            $vehicle_status = 'available';
+            $message = 'Rental completed successfully';
+            break;
+            
+        default:
+            throw new Exception('Invalid action');
     }
-    elseif ($action === 'complete') {
-        $stmt = $pdo->prepare("UPDATE rentals SET status = 'completed' WHERE rental_id = ?");
-        $stmt->execute([$rental_id]);
-        
-        // Update vehicle status back to available
-        $stmt = $pdo->prepare("SELECT vehicle_id FROM rentals WHERE rental_id = ?");
-        $stmt->execute([$rental_id]);
-        $rental = $stmt->fetch();
-        if ($rental) {
-            $stmt = $pdo->prepare("UPDATE vehicles SET status = 'available' WHERE vehicle_id = ?");
-            $stmt->execute([$rental['vehicle_id']]);
-        }
-        $message = 'Rental completed successfully!';
+    
+    // Update rental status
+    $stmt = $pdo->prepare("UPDATE rentals SET status = ? WHERE rental_id = ?");
+    $stmt->execute([$new_status, $rental_id]);
+    
+    // Update vehicle status if needed
+    if ($update_vehicle) {
+        $stmt = $pdo->prepare("UPDATE vehicles SET status = ? WHERE vehicle_id = ?");
+        $stmt->execute([$vehicle_status, $rental['vehicle_id']]);
     }
+    
+    $pdo->commit();
     
     echo json_encode(['success' => true, 'message' => $message]);
-    
+} catch (Exception $e) {
+    $pdo->rollBack();
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'message' => 'Operation failed: ' . $e->getMessage()]);
+    $pdo->rollBack();
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
 ?>

@@ -54,6 +54,16 @@ if (!isCustomer()) {
         </div>
     </div>
 
+    <!-- Stats Summary -->
+    <div id="statsContainer" class="row mb-3" style="display: none;">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                Showing vehicles with <strong id="availableSlotsCount">0</strong> available time slots
+            </div>
+        </div>
+    </div>
+
     <!-- Vehicles Grid Container -->
     <div id="vehiclesContainer">
         <div class="row">
@@ -72,6 +82,7 @@ if (!isCustomer()) {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     border-radius: 12px;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .card:hover {
@@ -113,6 +124,47 @@ if (!isCustomer()) {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.availability-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    background: #28a745;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.no-schedule-badge {
+    background: #dc3545;
+}
+
+.slot-count {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+.btn-book {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    border: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-book:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+}
+
+.btn-book:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 </style>
 
@@ -212,7 +264,7 @@ $(document).ready(function() {
         });
     }
     
-    // Load vehicles function
+    // Load vehicles function - NOW ONLY SHOWS VEHICLES WITH AVAILABLE SCHEDULES
     function loadVehicles(silent = false, showNotification = false, showLoading = false) {
         if (showLoading) {
             $('#vehiclesContainer').html(`
@@ -232,7 +284,7 @@ $(document).ready(function() {
         }
         
         $.ajax({
-            url: 'ajax/get_vehicles_customer.php',
+            url: 'ajax/get_vehicles_with_schedules.php',
             type: 'GET',
             data: { 
                 type: currentType, 
@@ -242,12 +294,16 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.success) {
                     displayVehicles(response.vehicles);
+                    if (response.total_slots !== undefined) {
+                        $('#statsContainer').show();
+                        $('#availableSlotsCount').text(response.total_slots);
+                    }
                     
                     if (showNotification) {
                         Swal.fire({
                             icon: 'success',
                             title: 'Refreshed!',
-                            text: `Found ${response.vehicles.length} vehicles.`,
+                            text: `Found ${response.vehicles.length} vehicles with available slots.`,
                             toast: true,
                             position: 'top-end',
                             showConfirmButton: false,
@@ -256,6 +312,7 @@ $(document).ready(function() {
                     }
                 } else {
                     console.error('Error:', response.message);
+                    displayNoVehicles();
                 }
             },
             error: function(xhr, status, error) {
@@ -271,7 +328,7 @@ $(document).ready(function() {
                         timer: 3000
                     });
                 }
-                displaySampleVehicles();
+                displayNoVehicles();
             },
             complete: function() {
                 if (!silent) {
@@ -284,21 +341,7 @@ $(document).ready(function() {
     // Display vehicles in grid
     function displayVehicles(vehicles) {
         if (vehicles.length === 0) {
-            $('#vehiclesContainer').html(`
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="card text-center py-5">
-                            <i class="fas fa-inbox" style="font-size: 48px; color: #ccc; margin-bottom: 20px;"></i>
-                            <p class="text-muted">No vehicles available matching your criteria.</p>
-                            <div>
-                                <button class="btn btn-outline-primary" onclick="resetFilters()">
-                                    <i class="fas fa-undo"></i> Reset Filters
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `);
+            displayNoVehicles();
             return;
         }
         
@@ -311,10 +354,17 @@ $(document).ready(function() {
                     <i class="fas fa-car"></i>
                    </div>`;
             
+            // Show available slots count
+            const slotsCount = vehicle.available_slots || 0;
+            const slotsText = slotsCount === 1 ? '1 available slot' : `${slotsCount} available slots`;
+            
             html += `
                 <div class="col-md-4 mb-4">
                     <div class="card h-100 shadow-sm vehicle-card">
                         ${imageHtml}
+                        <div class="availability-badge">
+                            <i class="fas fa-calendar-check"></i> ${slotsText}
+                        </div>
                         <div class="card-body">
                             <h5 class="card-title">${escapeHtml(vehicle.model)}</h5>
                             <p class="text-muted mb-2">
@@ -329,17 +379,14 @@ $(document).ready(function() {
                             <p class="text-muted mb-2">
                                 <i class="fas fa-users"></i> Capacity: ${passengerCapacity} passengers
                             </p>
-                            <p class="text-muted mb-3">
-                                <i class="fas fa-tachometer-alt"></i> ${Number(vehicle.current_mileage).toLocaleString()} km
-                            </p>
-                            <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex justify-content-between align-items-center mt-3">
                                 <div>
                                     <h4 class="mb-0 text-success">₱${Number(vehicle.price_per_day).toLocaleString()}</h4>
                                     <small class="text-muted">per day</small>
                                 </div>
-                                <a href="book-rental.php?vehicle_id=${vehicle.vehicle_id}" class="btn btn-primary">
-                                    <i class="fas fa-calendar-check"></i> Book Now
-                                </a>
+                                <button onclick="viewSchedule(${vehicle.vehicle_id}, '${escapeHtml(vehicle.model)}')" class="btn btn-primary">
+                                    <i class="fas fa-calendar-alt"></i> View Slots
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -350,6 +397,34 @@ $(document).ready(function() {
         $('#vehiclesContainer').html(html);
     }
     
+    // View schedule for vehicle
+    window.viewSchedule = function(vehicleId, vehicleName) {
+        // Redirect to schedule viewer or open modal
+        window.location.href = `vehicle-schedules.php?vehicle_id=${vehicleId}`;
+    };
+    
+    // Display no vehicles message
+    function displayNoVehicles() {
+        $('#vehiclesContainer').html(`
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card text-center py-5">
+                        <i class="fas fa-calendar-times" style="font-size: 48px; color: #ccc; margin-bottom: 20px;"></i>
+                        <h5 class="text-muted">No Available Vehicles</h5>
+                        <p class="text-muted">There are no vehicles with available time slots at the moment.</p>
+                        <p class="text-muted">Please check back later or contact support for assistance.</p>
+                        <div>
+                            <button class="btn btn-outline-primary" onclick="resetFilters()">
+                                <i class="fas fa-undo"></i> Reset Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+        $('#statsContainer').hide();
+    }
+    
     // Reset filters function
     window.resetFilters = function() {
         currentType = '';
@@ -358,35 +433,6 @@ $(document).ready(function() {
         $('#priceFilter').val('');
         loadVehicles(false, false, true);
     };
-    
-    // Sample vehicles for fallback
-    function displaySampleVehicles() {
-        const sampleVehicles = [
-            {
-                vehicle_id: 1,
-                model: 'Toyota Fortuner',
-                plate_number: 'ABC-1234',
-                year: 2022,
-                type: 'SUV',
-                passenger_capacity: 7,
-                current_mileage: 15000,
-                price_per_day: 3500,
-                photo_url: ''
-            },
-            {
-                vehicle_id: 2,
-                model: 'Honda Civic',
-                plate_number: 'DEF-5678',
-                year: 2023,
-                type: 'Sedan',
-                passenger_capacity: 5,
-                current_mileage: 8000,
-                price_per_day: 2500,
-                photo_url: ''
-            }
-        ];
-        displayVehicles(sampleVehicles);
-    }
     
     function escapeHtml(text) {
         if (!text) return '';

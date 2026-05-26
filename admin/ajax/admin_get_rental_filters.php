@@ -1,25 +1,43 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once '../../config/database.php';
-session_start();
+require_once '../../config/constants.php';
+
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+if (!isAdmin()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
 
-$statuses = ['pending', 'approved', 'active', 'completed', 'cancelled'];
-$filters = [];
-$total = 0;
-
-foreach ($statuses as $status) {
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM rentals WHERE status = ?");
-    $stmt->execute([$status]);
-    $count = $stmt->fetchColumn();
-    $filters[$status] = $count;
-    $total += $count;
+try {
+    // Get counts for each status
+    $stmt = $pdo->query("
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
+            SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
+        FROM rentals
+    ");
+    $counts = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        'success' => true,
+        'filters' => [
+            'total' => (int)$counts['total'],
+            'pending' => (int)$counts['pending'],
+            'approved' => (int)$counts['approved'],
+            'active' => (int)$counts['active'],
+            'completed' => (int)$counts['completed'],
+            'cancelled' => (int)$counts['cancelled']
+        ]
+    ]);
+} catch (PDOException $e) {
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
-$filters['total'] = $total;
-
-echo json_encode(['success' => true, 'filters' => $filters]);
 ?>

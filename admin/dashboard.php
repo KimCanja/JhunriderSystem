@@ -165,7 +165,7 @@ $recent_rentals = $stmt->fetchAll();
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
-                                 licensierad
+                                 
                             </div>
                         <?php else: ?>
                             <p class="text-muted text-center py-3">No repeat offenders at this time.</p>
@@ -191,20 +191,9 @@ $recent_rentals = $stmt->fetchAll();
                                             <th>Status</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        <?php foreach ($recent_rentals as $rental): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($rental['name']); ?></td>
-                                                <td><?php echo htmlspecialchars($rental['model']); ?></td>
-                                                <td>
-                                                    <span class="badge bg-<?php echo $rental['status'] == 'active' ? 'success' : ($rental['status'] == 'pending' ? 'warning' : 'secondary'); ?>">
-                                                        <?php echo ucfirst($rental['status']); ?>
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                 licensierad
+                                    <!--gidelete nko-->
+                                  
+                                
                             </div>
                         <?php else: ?>
                             <p class="text-muted text-center py-3">No recent rentals found.</p>
@@ -214,8 +203,9 @@ $recent_rentals = $stmt->fetchAll();
             </div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="row">
+      <!--giremove nko-->
+  <!-- Quick Actions -->
+      <!--  <div class="row">
             <div class="col-md-12">
                 <div class="card">
                     <div class="card-header">
@@ -239,8 +229,7 @@ $recent_rentals = $stmt->fetchAll();
             </div>
         </div>
     </div>
-</div>
-
+</div>-->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
@@ -336,7 +325,7 @@ $(document).ready(function() {
                                 </tr>
                             `;
                         });
-                        offendersHtml += `</tbody>办ек</div>`;
+                        offendersHtml += `</tbody></div>`;
                         $('#repeat_offenders_list').html(offendersHtml);
                     } else {
                         $('#repeat_offenders_list').html('<p class="text-muted text-center py-3">No repeat offenders at this time.</p>');
@@ -362,7 +351,7 @@ $(document).ready(function() {
                                 </tr>
                             `;
                         });
-                        rentalsHtml += `</tbody>办ек</div>`;
+                        rentalsHtml += `</tbody></div>`;
                         $('#recent_rentals_list').html(rentalsHtml);
                     } else {
                         $('#recent_rentals_list').html('<p class="text-muted text-center py-3">No recent rentals found.</p>');

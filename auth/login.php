@@ -12,29 +12,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email) || empty($password)) {
         $error = 'Email and password are required.';
     } else {
-        // Get user from database
-        $stmt = $pdo->prepare("SELECT id, name, email, password, role FROM users WHERE email = ?");
+        // Get user from database including verification status
+        $stmt = $pdo->prepare("SELECT id, name, email, password, role, is_verified FROM users WHERE email = ?");
         $stmt->execute([$email]);
-        $user = $stmt->fetch();
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Plain text password comparison
-        if ($user && $password === $user['password']) {
-            // Set session variables
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['name'] = $user['name'];
-            $_SESSION['email'] = $user['email'];
-            $_SESSION['role'] = $user['role'];
-            
-            // Redirect based on role
-            if ($user['role'] === 'admin') {
-                header("Location: /JhunriderSystem/admin/dashboard.php");
-                exit();
+        if ($user) {
+            // Check if email is verified
+            if (!$user['is_verified']) {
+                $error = 'Please verify your email before logging in. 
+                          <a href="verify-email-pending.php?email=' . urlencode($user['email']) . '" class="alert-link" style="color: #16A34A; text-decoration: underline;">Click here to verify</a>';
+            } 
+            // Plain text password comparison (as used in your original code)
+            elseif ($password === $user['password']) {
+                // Set session variables
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['name'] = $user['name'];
+                $_SESSION['email'] = $user['email'];
+                $_SESSION['role'] = $user['role'];
+                
+                // Redirect based on role
+                if ($user['role'] === 'admin') {
+                    header("Location: /JhunriderSystem/admin/dashboard.php");
+                    exit();
+                } else {
+                    header("Location: /JhunriderSystem/customer/dashboard.php");
+                    exit();
+                }
             } else {
-                header("Location: /JhunriderSystem/customer/dashboard.php");
-                exit();
+                $error = 'Invalid email or password.';
             }
         } else {
-            $error = 'Invalid email or password.';
+            $error = 'Email not found.';
         }
     }
 }
@@ -78,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             --border-color: #374151;
             --white: #FFFFFF;
             --danger: #EF4444;
+            --warning: #F59E0B;
         }
 
         /* Split Layout Container */
@@ -382,6 +392,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: #FCD34D;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .alert-link {
+            color: #16A34A;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+
+        .alert-link:hover {
+            color: #22C55E;
+        }
+
         /* Responsive */
         @media (max-width: 992px) {
             .login-wrapper {
@@ -447,7 +473,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <?php if ($error): ?>
                     <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?>
+                        <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
                     </div>
                 <?php endif; ?>
 
@@ -457,7 +483,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label class="form-label">Email Address</label>
                         <div class="input-wrapper email-field">
                             <i class="fas fa-envelope input-icon"></i>
-                            <input type="email" class="form-control" name="email" id="email" placeholder="you@example.com" required autocomplete="off">
+                            <input type="email" class="form-control" name="email" id="email" placeholder="you@example.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required autocomplete="off">
                             <span class="clear-btn" id="clearEmail" onclick="clearField('email')">
                                 <i class="fas fa-times-circle"></i>
                             </span>
@@ -473,7 +499,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <i class="fas fa-eye toggle-password" onclick="togglePassword()"></i>
                         </div>
                         <div class="forgot-password">
-                            <a href="#">Forgot Password?</a>
+                            <a href="forgot-password.php">Forgot Password?</a>
                         </div>
                     </div>
 
@@ -515,14 +541,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Show/hide clear button for email field
-        document.getElementById('email').addEventListener('input', function() {
-            const clearBtn = document.getElementById('clearEmail');
-            if (this.value.length > 0) {
-                clearBtn.style.display = 'block';
-            } else {
-                clearBtn.style.display = 'none';
+        const emailField = document.getElementById('email');
+        if (emailField) {
+            emailField.addEventListener('input', function() {
+                const clearBtn = document.getElementById('clearEmail');
+                if (this.value.length > 0) {
+                    clearBtn.style.display = 'block';
+                } else {
+                    clearBtn.style.display = 'none';
+                }
+            });
+            
+            // Trigger on page load if there's a value
+            if (emailField.value.length > 0) {
+                const clearBtn = document.getElementById('clearEmail');
+                if (clearBtn) clearBtn.style.display = 'block';
             }
-        });
+        }
 
         // Form submit loading state
         document.getElementById('loginForm').addEventListener('submit', function() {

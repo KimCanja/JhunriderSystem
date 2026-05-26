@@ -63,6 +63,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
+// Get vehicle data for editing
+$edit_vehicle = null;
+if (isset($_GET['edit'])) {
+    $edit_id = $_GET['edit'];
+    $stmt = $pdo->prepare("SELECT * FROM vehicles WHERE vehicle_id = ?");
+    $stmt->execute([$edit_id]);
+    $edit_vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
 require_once '../includes/header.php';
 require_once '../includes/admin-sidebar.php';
 require_once '../includes/sos-button.php';
@@ -90,7 +99,7 @@ $vehicles = $stmt->fetchAll();
 
     <div class="row mb-4">
         <div class="col-12">
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVehicleModal">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVehicleModal" onclick="resetForm()">
                 <i class="fas fa-plus"></i> Add Vehicle
             </button>
         </div>
@@ -139,7 +148,7 @@ $vehicles = $stmt->fetchAll();
                                     <button class="btn btn-sm btn-outline-primary" onclick="editVehicle(<?php echo $vehicle['vehicle_id']; ?>)">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <a href="?delete=<?php echo $vehicle['vehicle_id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?')">
+                                    <a href="?delete=<?php echo $vehicle['vehicle_id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this vehicle?')">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 </td>
@@ -152,44 +161,45 @@ $vehicles = $stmt->fetchAll();
     </div>
 </div>
 
-<!-- Add Vehicle Modal -->
+<!-- Add/Edit Vehicle Modal -->
 <div class="modal fade" id="addVehicleModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add New Vehicle</h5>
+                <h5 class="modal-title" id="vehicleModalTitle">Add New Vehicle</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" id="vehicleForm">
+                <input type="hidden" name="vehicle_id" id="vehicle_id">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label>Model</label>
-                            <input type="text" name="model" class="form-control" required>
+                            <input type="text" name="model" id="model" class="form-control" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Plate Number</label>
-                            <input type="text" name="plate_number" class="form-control" required>
+                            <input type="text" name="plate_number" id="plate_number" class="form-control" required>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label>Year</label>
-                            <input type="number" name="year" class="form-control" required>
+                            <input type="number" name="year" id="year" class="form-control" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Type</label>
-                            <input type="text" name="type" class="form-control" required>
+                            <input type="text" name="type" id="type" class="form-control" required>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label>Passenger Capacity</label>
-                            <input type="number" name="passenger_capacity" class="form-control" value="4">
+                            <input type="number" name="passenger_capacity" id="passenger_capacity" class="form-control" value="4">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Status</label>
-                            <select name="status" class="form-select">
+                            <select name="status" id="status" class="form-select">
                                 <option value="available">Available</option>
                                 <option value="rented">Rented</option>
                                 <option value="maintenance">Maintenance</option>
@@ -198,17 +208,22 @@ $vehicles = $stmt->fetchAll();
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label>Price per Day</label>
-                            <input type="number" name="price_per_day" class="form-control" step="0.01" required>
+                            <label>Price per Day (₱)</label>
+                            <input type="number" name="price_per_day" id="price_per_day" class="form-control" step="0.01" required>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label>Current Mileage</label>
-                            <input type="number" name="current_mileage" class="form-control" value="0">
+                            <label>Current Mileage (km)</label>
+                            <input type="number" name="current_mileage" id="current_mileage" class="form-control" value="0">
                         </div>
                     </div>
                     <div class="mb-3">
                         <label>Vehicle Photo</label>
-                        <input type="file" name="vehicle_photo" class="form-control" accept="image/*">
+                        <input type="file" name="vehicle_photo" id="vehicle_photo" class="form-control" accept="image/*">
+                        <small class="text-muted">Leave empty to keep current photo when editing</small>
+                    </div>
+                    <div id="currentPhoto" style="display: none;">
+                        <label>Current Photo:</label>
+                        <img id="currentPhotoImg" src="" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px;">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -289,7 +304,7 @@ $(document).ready(function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: 'Could not connect to server. Check if admin/ajax/get_vehicles.php exists.',
+                        text: 'Could not connect to server.',
                         toast: true,
                         position: 'top-end',
                         showConfirmButton: false,
@@ -315,15 +330,15 @@ $(document).ready(function() {
             html += `
                 <tr>
                     <td>${imageHtml}</td>
-                    <td>${escapeHtml(v.model)}</strong></td>
-                    <td>${escapeHtml(v.plate_number)}</strong></td>
-                    <td>${escapeHtml(v.type)}</strong></td>
-                    <td>₱${Number(v.price_per_day).toLocaleString()}</strong></td>
+                    <td><strong>${escapeHtml(v.model)}</strong></td>
+                    <td>${escapeHtml(v.plate_number)}</td>
+                    <td>${escapeHtml(v.type)}</td>
+                    <td>₱${Number(v.price_per_day).toLocaleString()}</td>
                     <td><span class="badge bg-${badgeClass}">${v.status}</span></td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary" onclick="editVehicle(${v.vehicle_id})"><i class="fas fa-edit"></i></button>
-                        <a href="?delete=${v.vehicle_id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete?')"><i class="fas fa-trash"></i></a>
-                    </strong>
+                        <a href="?delete=${v.vehicle_id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this vehicle?')"><i class="fas fa-trash"></i></a>
+                    </td>
                 </tr>
             `;
         });
@@ -341,8 +356,67 @@ $(document).ready(function() {
     }
 });
 
+// Edit vehicle function - FIXED
 function editVehicle(id) {
-    window.location.href = `?edit=${id}`;
+    // Fetch vehicle data via AJAX
+    $.ajax({
+        url: 'ajax/get_vehicle.php',
+        type: 'GET',
+        data: { id: id },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                const vehicle = response.vehicle;
+                
+                // Populate modal fields
+                $('#vehicle_id').val(vehicle.vehicle_id);
+                $('#model').val(vehicle.model);
+                $('#plate_number').val(vehicle.plate_number);
+                $('#year').val(vehicle.year);
+                $('#type').val(vehicle.type);
+                $('#passenger_capacity').val(vehicle.passenger_capacity);
+                $('#status').val(vehicle.status);
+                $('#price_per_day').val(vehicle.price_per_day);
+                $('#current_mileage').val(vehicle.current_mileage);
+                
+                // Show current photo if exists
+                if (vehicle.photo_url) {
+                    $('#currentPhotoImg').attr('src', '<?php echo BASE_URL; ?>' + vehicle.photo_url);
+                    $('#currentPhoto').show();
+                } else {
+                    $('#currentPhoto').hide();
+                }
+                
+                // Change modal title
+                $('#vehicleModalTitle').text('Edit Vehicle');
+                
+                // Show modal
+                $('#addVehicleModal').modal('show');
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Could not load vehicle data'
+                });
+            }
+        },
+        error: function() {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Could not connect to server'
+            });
+        }
+    });
+}
+
+// Reset form function
+function resetForm() {
+    $('#vehicleForm')[0].reset();
+    $('#vehicle_id').val('');
+    $('#vehicleModalTitle').text('Add New Vehicle');
+    $('#currentPhoto').hide();
+    $('#vehicle_photo').val('');
 }
 </script>
 

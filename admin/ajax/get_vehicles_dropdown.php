@@ -7,21 +7,18 @@ require_once '../../config/constants.php';
 
 header('Content-Type: application/json');
 
+// Check if user is admin
 if (!isAdmin()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
 
 try {
-    $stmt = $pdo->query("
-        SELECT s.*, v.model, v.plate_number 
-        FROM schedules s
-        JOIN vehicles v ON s.vehicle_id = v.vehicle_id
-        ORDER BY s.available_date DESC, s.time_slot ASC
-    ");
-    $schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Get only available vehicles (not deleted/maintenance if you want)
+    $stmt = $pdo->query("SELECT vehicle_id, model, plate_number FROM vehicles ORDER BY model ASC");
+    $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    echo json_encode(['success' => true, 'schedules' => $schedules]);
+    echo json_encode(['success' => true, 'vehicles' => $vehicles]);
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
